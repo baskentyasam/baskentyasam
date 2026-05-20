@@ -13,7 +13,10 @@ interface OccupancyData {
 
 const REFRESH_INTERVAL_MS = 5000;
 
-const LibraryOccupancyPage: React.FC = () => {
+/** Bölge slug'ı; backend `api/Occupancy/{zoneName}` ile uyumlu (veri yoksa API sıfır döner). */
+const PARKING_ZONE = "otopark";
+
+const ParkingOccupancyPage: React.FC = () => {
   const user = getCurrentUser();
   const isStudent = user?.role === "student";
 
@@ -44,7 +47,9 @@ const LibraryOccupancyPage: React.FC = () => {
 
   const fetchOccupancy = useCallback(async () => {
     try {
-      const response = await apiClient.get<OccupancyData>("/occupancy/kutuphane");
+      const response = await apiClient.get<OccupancyData>(
+        `/occupancy/${PARKING_ZONE}`
+      );
       const data = response.data;
 
       setCurrentCount(data.count);
@@ -63,7 +68,7 @@ const LibraryOccupancyPage: React.FC = () => {
 
       setError(null);
     } catch (err) {
-      setError("Doluluk verisi alınamadı.");
+      setError("Otopark doluluk verisi alınamadı.");
     } finally {
       setLoading(false);
     }
@@ -105,9 +110,11 @@ const LibraryOccupancyPage: React.FC = () => {
   };
 
   const getStatusText = (rate: number) => {
-    if (rate <= 40) return "Kütüphane şu anda uygun yoğunlukta.";
-    if (rate <= 70) return "Kütüphane orta yoğunlukta.";
-    return "Kütüphane şu anda oldukça yoğun.";
+    if (rate <= 40)
+      return "Otopark şu anda uygun yoğunlukta; park yeri bulma ihtimali yüksek.";
+    if (rate <= 70)
+      return "Otopark orta yoğunlukta; alternatif zaman veya çıkış planı düşünün.";
+    return "Otopark şu anda oldukça dolu ya da yakın dolulukta.";
   };
 
   if (loading) {
@@ -115,7 +122,7 @@ const LibraryOccupancyPage: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Doluluk verisi yükleniyor...</p>
+          <p className="text-slate-600">Otopark doluluğu yükleniyor...</p>
         </div>
       </div>
     );
@@ -125,7 +132,7 @@ const LibraryOccupancyPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="w-full border-b bg-[#d71920] text-white">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-6">
-          <h1 className="text-2xl font-semibold">Kütüphane Doluluk Oranı</h1>
+          <h1 className="text-2xl font-semibold">Otopark Doluluk Oranı</h1>
           <Link
             to={isStudent ? "/ogrenci" : "/ogretim-elemani"}
             className="text-sm underline hover:opacity-90"
@@ -148,36 +155,36 @@ const LibraryOccupancyPage: React.FC = () => {
           <div className="bg-white rounded-3xl shadow-md border border-slate-200 p-8 md:p-10">
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-slate-900 mb-2">
-                Güncel Kütüphane Yoğunluğu
+                Güncel Otopark Yoğunluğu
               </h2>
               <p className="text-slate-600 text-base">
-                Kütüphanenin anlık doluluk durumu aşağıda gösterilmektedir.
+                Kampüs otoparkının anlık doluluk durumu aşağıda gösterilmektedir.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                 <p className="text-sm text-slate-500 mb-2">
-                  Kütüphane Kapasitesi
+                  Toplam park yeri kapasitesi
                 </p>
                 <p className="text-3xl font-bold text-slate-900">
                   {totalCapacity}
                 </p>
-                <p className="text-sm text-slate-600 mt-1">kişi</p>
+                <p className="text-sm text-slate-600 mt-1">araç</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                 <p className="text-sm text-slate-500 mb-2">
-                  İçerideki Kişi Sayısı
+                  Dolu park yeri sayısı
                 </p>
                 <p className="text-3xl font-bold text-slate-900">
                   {currentCount}
                 </p>
-                <p className="text-sm text-slate-600 mt-1">kişi</p>
+                <p className="text-sm text-slate-600 mt-1">araç</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <p className="text-sm text-slate-500 mb-2">Doluluk Oranı</p>
+                <p className="text-sm text-slate-500 mb-2">Doluluk oranı</p>
                 <p
                   className={`text-3xl font-bold ${getTextColor(occupancyRate)}`}
                 >
@@ -218,7 +225,7 @@ const LibraryOccupancyPage: React.FC = () => {
                     Son 7 Günün Saatlik Yoğunluğu
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Saatlere göre ortalama doluluk oranı
+                    Saatlere göre ortalama otopark doluluk oranı
                   </p>
                 </div>
 
@@ -308,13 +315,13 @@ const LibraryOccupancyPage: React.FC = () => {
 
               <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
                 <p>
-                  Son 7 güne göre en yoğun saat:{" "}
+                  Son 7 güne göre otoparkta en yoğun saat:{" "}
                   <span className="font-semibold text-slate-900">
                     {peakHour.hour} (%{peakHour.rate})
                   </span>
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Bu grafik son 1 haftanın saatlik ortalama doluluk oranına göre
+                  Bu grafik son 1 haftanın saatlik ortalama otopark doluluğuna göre
                   hazırlanmıştır.
                 </p>
               </div>
@@ -322,15 +329,17 @@ const LibraryOccupancyPage: React.FC = () => {
 
             <div className="rounded-2xl bg-red-50 border border-red-100 p-5">
               <p className="text-base text-slate-800 leading-7">
-                Kütüphane kapasitesi{" "}
-                <span className="font-semibold">{totalCapacity} kişi</span>, şu
-                anda içeride{" "}
-                <span className="font-semibold">{currentCount} kişi</span>{" "}
-                bulunuyor. Buna göre kütüphane şu anda{" "}
+                Otopark toplam{" "}
+                <span className="font-semibold">
+                  {totalCapacity} araçlık
+                </span>{" "}
+                kapasiteye sahip; şu anda{" "}
+                <span className="font-semibold">{currentCount} araç</span> park
+                halinde. Buna göre doluluk oranı{" "}
                 <span className={`font-bold ${getTextColor(occupancyRate)}`}>
                   %{occupancyRate}
                 </span>{" "}
-                oranında dolu.
+                düzeyindedir.
               </p>
             </div>
 
@@ -342,7 +351,8 @@ const LibraryOccupancyPage: React.FC = () => {
                 {lastUpdated}
               </p>
               <p>
-                Veriler yoğunluk durumuna göre otomatik olarak güncellenmektedir.
+                Veriler otopark doluluk durumuna göre otomatik olarak
+                güncellenmektedir.
               </p>
             </div>
           </div>
@@ -352,4 +362,4 @@ const LibraryOccupancyPage: React.FC = () => {
   );
 };
 
-export default LibraryOccupancyPage;
+export default ParkingOccupancyPage;

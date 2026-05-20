@@ -134,6 +134,7 @@ try
     builder.Services.AddScoped<ICafeService, CafeService>();
     builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
     builder.Services.AddScoped<ScheduleService>();
+    builder.Services.AddScoped<IOccupancyService, OccupancyService>();
 
     // Background Service
     builder.Services.AddHostedService<OrderCleanupService>();
@@ -286,6 +287,98 @@ try
                     ";
                     await loginTypeCommand.ExecuteNonQueryAsync();
                     Console.WriteLine("login_type enum kontrol edildi/düzeltildi.");
+
+                    // 3. Kullanıcı profil alanları (idempotent)
+                    using var profileColumnsCmd = connection.CreateCommand();
+                    profileColumnsCmd.CommandText = @"
+                        DO $$
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'profile_image'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""profile_image"" TEXT;
+                                RAISE NOTICE 'profile_image kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'department'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""department"" VARCHAR(200);
+                                RAISE NOTICE 'department kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'room_number'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""room_number"" VARCHAR(50);
+                                RAISE NOTICE 'room_number kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'phone_number'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""phone_number"" VARCHAR(50);
+                                RAISE NOTICE 'phone_number kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'class_level'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""class_level"" VARCHAR(20);
+                                RAISE NOTICE 'class_level kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'courses'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""courses"" TEXT;
+                                RAISE NOTICE 'courses kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'first_login_at'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""first_login_at"" TIMESTAMP WITHOUT TIME ZONE;
+                                RAISE NOTICE 'first_login_at kolonu eklendi.';
+                            END IF;
+
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = 'users' AND column_name = 'last_login_at'
+                            ) THEN
+                                ALTER TABLE ""users"" ADD COLUMN ""last_login_at"" TIMESTAMP WITHOUT TIME ZONE;
+                                RAISE NOTICE 'last_login_at kolonu eklendi.';
+                            END IF;
+                        END $$;
+                    ";
+                    await profileColumnsCmd.ExecuteNonQueryAsync();
+                    Console.WriteLine("Kullanıcı profil kolonları kontrol edildi/eklendi.");
+
+                    // 4. Doluluk sensör eventleri tablosu (idempotent)
+                    using var sensorEventTableCmd = connection.CreateCommand();
+                    sensorEventTableCmd.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS ""OccupancySensorEvents"" (
+                            ""Id"" SERIAL PRIMARY KEY,
+                            ""ZoneName"" VARCHAR(100) NOT NULL,
+                            ""FromTime"" TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+                            ""ToTime"" TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+                            ""InCount"" INTEGER NOT NULL,
+                            ""OutCount"" INTEGER NOT NULL,
+                            ""ReceivedAt"" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+                        );
+
+                        CREATE INDEX IF NOT EXISTS ""IX_OccupancySensorEvents_Zone_ReceivedAt""
+                            ON ""OccupancySensorEvents"" (""ZoneName"", ""ReceivedAt"");
+                    ";
+                    await sensorEventTableCmd.ExecuteNonQueryAsync();
+                    Console.WriteLine("OccupancySensorEvents tablosu kontrol edildi/oluşturuldu.");
                 }
                 finally
                 {

@@ -49,7 +49,7 @@ CREATE TABLE "instructor_schedule" (
     "instructor_id" INTEGER NOT NULL,
     "day_of_week" SMALLINT NOT NULL CHECK ("day_of_week" >= 1 AND "day_of_week" <= 5),
     "start_time" TIME WITHOUT TIME ZONE NOT NULL,
-    "course_name" VARCHAR(200) NOT NULL DEFAULT '',
+    "course_code" TEXT NULL,
     
     -- Foreign Key Constraint
     CONSTRAINT "FK_instructor_schedule_users_instructor_id" 

@@ -7,6 +7,8 @@ const LoginPage: React.FC = () => {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<"student" | "instructor" | "cashier">("student");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -95,10 +97,18 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Eğer kullanıcı adı bir e-posta değilse, örnek bir e-posta kullan
+      const trimmedFirst = firstName.trim();
+      const trimmedLast = lastName.trim();
+
+      if (!trimmedFirst || !trimmedLast) {
+        setError("Lütfen ad ve soyad alanlarını doldurun.");
+        setLoading(false);
+        return;
+      }
+
       const isEmail = username.includes("@");
       const email = isEmail ? username : `${username}@example.com`;
-      const name = isEmail ? username.split("@")[0] : username;
+      const name = `${trimmedFirst} ${trimmedLast}`;
 
       const response = await register({
         name,
@@ -116,6 +126,8 @@ const LoginPage: React.FC = () => {
         setIsSignup(false);
         setUsername("");
         setPassword("");
+        setFirstName("");
+        setLastName("");
         return; // Fonksiyondan çık, yönlendirme yapma
       }
 
@@ -229,9 +241,32 @@ const LoginPage: React.FC = () => {
           </div>
         )}
 
+        {isSignup && (
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              placeholder="Ad"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="border rounded-lg px-4 py-2"
+              autoComplete="given-name"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Soyad"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="border rounded-lg px-4 py-2"
+              autoComplete="family-name"
+              required
+            />
+          </div>
+        )}
+
         <input
           type="text"
-          placeholder={isSignup ? "Kullanıcı adı" : "Kullanıcı adı"}
+          placeholder={isSignup ? "Kullanıcı adı / E-posta" : "Kullanıcı adı"}
           value={username}
           onChange={(e) => {
             const val = e.target.value;

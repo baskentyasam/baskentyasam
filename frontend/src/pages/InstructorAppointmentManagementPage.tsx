@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   getInstructorAppointments,
@@ -7,7 +7,11 @@ import {
   Appointment,
   ApiError,
 } from "../services/appointmentService";
-import { getMySchedule, saveSchedule, ScheduleSlot } from "../services/scheduleService";
+import {
+  getMySchedule,
+  saveSchedule,
+  type ScheduleCell,
+} from "../services/scheduleService";
 
 const days = ["Pzt", "Sal", "Çar", "Per", "Cum"];
 const times = [
@@ -21,11 +25,56 @@ const times = [
   "16.00-16.50",
 ];
 
+const getInitials = (name?: string): string => {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+interface StudentInfoProps {
+  apt: Appointment;
+}
+
+const StudentInfo: React.FC<StudentInfoProps> = ({ apt }) => (
+  <div className="flex items-start gap-3">
+    <span className="flex-shrink-0 h-12 w-12 rounded-full overflow-hidden bg-gradient-to-br from-[#d71920] to-[#8a1014] flex items-center justify-center text-white text-sm font-bold">
+      {apt.studentProfileImage ? (
+        <img
+          src={apt.studentProfileImage}
+          alt={apt.studentName || "Öğrenci"}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        getInitials(apt.studentName)
+      )}
+    </span>
+
+    <div className="min-w-0">
+      <p className="text-sm font-semibold text-slate-900 truncate">
+        {apt.studentName || "Bilinmiyor"}
+      </p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600 mt-0.5">
+        {apt.studentNo && <span>No: {apt.studentNo}</span>}
+        {apt.studentDepartment && <span>· {apt.studentDepartment}</span>}
+        {apt.studentClassLevel && <span>· {apt.studentClassLevel}. sınıf</span>}
+      </div>
+    </div>
+  </div>
+);
+
 type TabType = "requests" | "myAppointments";
+type DragMode = "add" | "remove";
 
 const InstructorAppointmentManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("requests");
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleCell[]>([]);
+
+  const dragState = useRef<{ active: boolean; mode: DragMode }>({
+    active: false,
+    mode: "add",
+  });
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -37,24 +86,35 @@ const InstructorAppointmentManagement: React.FC = () => {
 
   useEffect(() => {
     loadSchedule();
-  }, []); // Sadece sayfa ilk yüklendiğinde çağrıl
+  }, []);
+
+  useEffect(() => {
+    const endDrag = () => {
+      dragState.current.active = false;
+    };
+
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("blur", endDrag);
+
+    return () => {
+      window.removeEventListener("mouseup", endDrag);
+      window.removeEventListener("blur", endDrag);
+    };
+  }, []);
 
   const loadAppointments = async () => {
     setLoading(true);
     setError("");
+
     try {
-      // "Gelen Talepler" sekmesi için pending-requests endpoint'ini çağır
-      // "Randevularım" sekmesi için my-appointments endpoint'ini çağır
       let data: Appointment[];
+
       if (activeTab === "requests") {
-        console.log("Pending requests yükleniyor...");
         data = await getPendingRequests();
-        console.log("Pending requests yüklendi:", data);
       } else {
-        console.log("Tüm randevular yükleniyor...");
         data = await getInstructorAppointments();
-        console.log("Tüm randevular yüklendi:", data);
       }
+
       setAppointments(data);
     } catch (err) {
       const apiError = err as ApiError;
@@ -70,15 +130,15 @@ const InstructorAppointmentManagement: React.FC = () => {
     status: "approved" | "rejected"
   ) => {
     try {
-      // Mevcut appointment'ı bul
       const appointment = appointments.find((apt) => apt.id === appointmentId);
+
       if (!appointment) {
         alert("Randevu bulunamadı");
         return;
       }
 
       await updateAppointmentStatus(appointmentId, status, appointment);
-      await loadAppointments(); // Listeyi yenile
+      await loadAppointments();
     } catch (err) {
       const apiError = err as ApiError;
       alert(
@@ -87,34 +147,87 @@ const InstructorAppointmentManagement: React.FC = () => {
     }
   };
 
-  const toggleSlot = (key: string) => {
-    setSelectedSlots((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+  const toggleSlotSimple = (key: string) => {
+    setScheduleSlots((prev) => {
+      const idx = prev.findIndex((s) => s.slot === key);
+
+      if (idx >= 0) {
+        return prev.filter((_, i) => i !== idx);
+      }
+
+      return [...prev, { slot: key, courseCode: "" }];
+    });
+  };
+
+  const applyDragToSlot = (key: string, mode: DragMode) => {
+    setScheduleSlots((prev) => {
+      const idx = prev.findIndex((s) => s.slot === key);
+
+      if (mode === "add" && idx < 0) {
+        return [...prev, { slot: key, courseCode: "" }];
+      }
+
+      if (mode === "remove" && idx >= 0) {
+        return prev.filter((_, i) => i !== idx);
+      }
+
+      return prev;
+    });
+  };
+
+  const onSlotPointerDown = (e: React.MouseEvent, key: string) => {
+    if ((e.target as HTMLElement).closest("input")) return;
+
+    e.preventDefault();
+
+    const already = scheduleSlots.some((s) => s.slot === key);
+    const mode: DragMode = already ? "remove" : "add";
+
+    dragState.current = { active: true, mode };
+    applyDragToSlot(key, mode);
+  };
+
+  const onSlotMouseEnter = (key: string) => {
+    if (!dragState.current.active) return;
+
+    applyDragToSlot(key, dragState.current.mode);
+  };
+
+  const updateSlotCourseCode = (slotKey: string, courseCode: string) => {
+    setScheduleSlots((prev) =>
+      prev.map((c) =>
+        c.slot === slotKey ? { ...c, courseCode } : c
+      )
     );
   };
 
   const loadSchedule = async () => {
     try {
       const schedule = await getMySchedule();
-      const slots = schedule.map((s) => s.slot);
-      setSelectedSlots(slots);
+
+      setScheduleSlots(
+        schedule.map((s) => ({
+          slot: s.slot,
+          courseCode: s.courseCode ?? "",
+        }))
+      );
     } catch (err) {
       console.error("Ders programı yükleme hatası:", err);
-      // Hata olsa bile devam et, sadece boş liste ile başla
     }
   };
 
   const handleSaveSchedule = async () => {
-    if (selectedSlots.length === 0) {
+    if (scheduleSlots.length === 0) {
       alert("Lütfen en az bir saat seçin.");
       return;
     }
 
     setSavingSchedule(true);
+
     try {
-      await saveSchedule(selectedSlots);
+      await saveSchedule(scheduleSlots);
       alert("Ders programı başarıyla kaydedildi!");
-    } catch (err: any) {
+    } catch (err) {
       const apiError = err as ApiError;
       alert(apiError.message || "Ders programı kaydedilirken bir hata oluştu");
     } finally {
@@ -122,29 +235,21 @@ const InstructorAppointmentManagement: React.FC = () => {
     }
   };
 
-  // Pending randevular (gelen talepler)
-  // Not: "requests" sekmesi için zaten pending-requests endpoint'i çağrılıyor,
-  // bu yüzden tüm appointments zaten pending. Ama yine de filtreleme yapalım güvenlik için.
-  const pendingAppointments = activeTab === "requests"
-    ? appointments // pending-requests endpoint'i zaten sadece pending döndürüyor
-    : appointments.filter((apt) => apt.status?.toLowerCase() === "pending");
+  const pendingAppointments =
+    activeTab === "requests"
+      ? appointments
+      : appointments.filter((apt) => apt.status?.toLowerCase() === "pending");
 
-  // Approved randevular (onaylanmış randevular)
   const approvedAppointments = appointments.filter(
     (apt) => apt.status?.toLowerCase() === "approved"
   );
 
-  // Debug: Randevuları console'a yazdır
-  console.log("Appointments state:", appointments);
-  console.log("Pending appointments:", pendingAppointments);
-  console.log("Active tab:", activeTab);
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Üst bar */}
       <header className="w-full border-b bg-[#d71920] text-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
           <h1 className="text-2xl font-semibold">Randevu Yönetimi</h1>
+
           <Link
             to="/ogretim-elemani"
             className="text-sm underline hover:opacity-90"
@@ -156,32 +261,31 @@ const InstructorAppointmentManagement: React.FC = () => {
 
       <div className="flex-1 p-8">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* SOL TARAF */}
           <section className="lg:col-span-3 bg-white rounded-xl border shadow">
-            {/* Sekmeler */}
             <div className="flex border-b">
               <button
                 onClick={() => setActiveTab("requests")}
-                className={`flex-1 py-3 text-sm font-medium ${activeTab === "requests"
-                  ? "border-b-2 border-[#d71920] text-[#d71920]"
-                  : "text-slate-500"
-                  }`}
+                className={`flex-1 py-3 text-sm font-medium ${
+                  activeTab === "requests"
+                    ? "border-b-2 border-[#d71920] text-[#d71920]"
+                    : "text-slate-500"
+                }`}
               >
                 Gelen Talepler
               </button>
 
               <button
                 onClick={() => setActiveTab("myAppointments")}
-                className={`flex-1 py-3 text-sm font-medium ${activeTab === "myAppointments"
-                  ? "border-b-2 border-[#d71920] text-[#d71920]"
-                  : "text-slate-500"
-                  }`}
+                className={`flex-1 py-3 text-sm font-medium ${
+                  activeTab === "myAppointments"
+                    ? "border-b-2 border-[#d71920] text-[#d71920]"
+                    : "text-slate-500"
+                }`}
               >
                 Randevularım
               </button>
             </div>
 
-            {/* İçerik */}
             <div className="p-6">
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -207,45 +311,10 @@ const InstructorAppointmentManagement: React.FC = () => {
                         key={apt.id}
                         className="border border-slate-200 rounded-lg p-4 bg-slate-50"
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-semibold text-slate-900">
-                              {(apt as any).subject || apt.course || "Ders belirtilmemiş"}
-                            </p>
-                            <p className="text-sm text-slate-600 mt-1">
-                              Öğrenci: {(apt as any).studentName || "Bilinmiyor"}
-                            </p>
-                            <p className="text-sm text-slate-600 mt-1">
-                              Sebep: {(() => {
-                                const reason = (apt as any).requestReason || apt.reason || "";
-                                const reasonLower = reason.toLowerCase().trim();
+                        <div className="flex justify-between items-start gap-3 mb-2">
+                          <StudentInfo apt={apt} />
 
-                                // Eğer reason "question", "exam", "other" gibi enum değerleriyse Türkçe'ye çevir
-                                // Aksi halde öğrencinin yazdığı özel metni göster
-                                if (reasonLower === "question") {
-                                  return "Soru sorma";
-                                } else if (reasonLower === "exam") {
-                                  return "Sınav kağıdına bakma";
-                                } else if (reasonLower === "other") {
-                                  return "Diğer";
-                                } else if (reason.trim()) {
-                                  // Öğrencinin yazdığı özel metin (request_reason kolonundan gelen)
-                                  return reason;
-                                } else {
-                                  return "Sebep belirtilmemiş";
-                                }
-                              })()}
-                            </p>
-                            <p className="text-sm text-slate-600">
-                              {apt.date ? new Date(apt.date).toLocaleDateString('tr-TR') : 'Tarih belirtilmemiş'} - {apt.time ? (typeof apt.time === 'string' ? apt.time : (typeof apt.time === 'object' && apt.time !== null ? `${String((apt.time as any).hours || 0).padStart(2, '0')}:${String((apt.time as any).minutes || 0).padStart(2, '0')}` : 'Saat belirtilmemiş')) : 'Saat belirtilmemiş'}
-                            </p>
-                            {(apt as any).rejectionReason && (
-                              <p className="text-sm text-red-500 mt-1 italic">
-                                Red Nedeni: {(apt as any).rejectionReason}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 shrink-0">
                             <button
                               onClick={() =>
                                 handleStatusUpdate(apt.id, "approved")
@@ -254,6 +323,7 @@ const InstructorAppointmentManagement: React.FC = () => {
                             >
                               Onayla
                             </button>
+
                             <button
                               onClick={() =>
                                 handleStatusUpdate(apt.id, "rejected")
@@ -263,6 +333,56 @@ const InstructorAppointmentManagement: React.FC = () => {
                               Reddet
                             </button>
                           </div>
+                        </div>
+
+                        <div className="border-t border-slate-200 pt-2 mt-2 space-y-1">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {(apt as any).subject ||
+                              apt.course ||
+                              "Ders belirtilmemiş"}
+                          </p>
+
+                          <p className="text-sm text-slate-600">
+                            Sebep:{" "}
+                            {(() => {
+                              const reason =
+                                (apt as any).requestReason || apt.reason || "";
+                              const reasonLower = reason.toLowerCase().trim();
+
+                              if (reasonLower === "question") return "Soru sorma";
+                              if (reasonLower === "exam")
+                                return "Sınav kağıdına bakma";
+                              if (reasonLower === "other") return "Diğer";
+                              if (reason.trim()) return reason;
+
+                              return "Sebep belirtilmemiş";
+                            })()}
+                          </p>
+
+                          <p className="text-sm text-slate-600">
+                            {apt.date
+                              ? new Date(apt.date).toLocaleDateString("tr-TR")
+                              : "Tarih belirtilmemiş"}{" "}
+                            -{" "}
+                            {apt.time
+                              ? typeof apt.time === "string"
+                                ? apt.time
+                                : typeof apt.time === "object" && apt.time !== null
+                                  ? `${String((apt.time as any).hours || 0).padStart(
+                                      2,
+                                      "0"
+                                    )}:${String(
+                                      (apt.time as any).minutes || 0
+                                    ).padStart(2, "0")}`
+                                  : "Saat belirtilmemiş"
+                              : "Saat belirtilmemiş"}
+                          </p>
+
+                          {(apt as any).rejectionReason && (
+                            <p className="text-sm text-red-500 italic">
+                              Red Nedeni: {(apt as any).rejectionReason}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))
@@ -282,33 +402,53 @@ const InstructorAppointmentManagement: React.FC = () => {
                         key={apt.id}
                         className="border border-slate-200 rounded-lg p-4 bg-white"
                       >
-                        <p className="font-semibold text-slate-900">
-                          {apt.course || "Ders belirtilmemiş"}
-                        </p>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Öğrenci: {(apt as any).studentName || "Bilinmiyor"}
-                        </p>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Sebep: {(() => {
-                            const r = apt.reason || "";
-                            const lower = r.toLowerCase().trim();
-                            if (lower === "question") return "Soru sorma";
-                            if (lower === "exam") return "Sınav kağıdına bakma";
-                            // Eger 'other' ise ve note varsa notu goster, yoksa 'Diğer' yaz
-                            if (lower === "other") return apt.note || "Diğer";
-                            // Diger durumlar (ozel metin)
-                            return r || "Sebep belirtilmemiş";
-                          })()}
-                        </p>
-                        <p className="text-sm text-slate-600">
-                          {apt.date ? new Date(apt.date).toLocaleDateString('tr-TR') : 'Tarih belirtilmemiş'} - {apt.time ? (typeof apt.time === 'string' ? apt.time : (typeof apt.time === 'object' && apt.time !== null ? `${String((apt.time as any).hours || 0).padStart(2, '0')}:${String((apt.time as any).minutes || 0).padStart(2, '0')}` : 'Saat belirtilmemiş')) : 'Saat belirtilmemiş'}
-                        </p>
-                        {apt.note && (
-                          <p className="text-sm text-slate-500 mt-1 italic">
-                            Not: {apt.note}
-                          </p>
-                        )}
+                        <StudentInfo apt={apt} />
 
+                        <div className="border-t border-slate-200 pt-2 mt-2 space-y-1">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {apt.course || "Ders belirtilmemiş"}
+                          </p>
+
+                          <p className="text-sm text-slate-600">
+                            Sebep:{" "}
+                            {(() => {
+                              const r = apt.reason || "";
+                              const lower = r.toLowerCase().trim();
+
+                              if (lower === "question") return "Soru sorma";
+                              if (lower === "exam")
+                                return "Sınav kağıdına bakma";
+                              if (lower === "other") return apt.note || "Diğer";
+
+                              return r || "Sebep belirtilmemiş";
+                            })()}
+                          </p>
+
+                          <p className="text-sm text-slate-600">
+                            {apt.date
+                              ? new Date(apt.date).toLocaleDateString("tr-TR")
+                              : "Tarih belirtilmemiş"}{" "}
+                            -{" "}
+                            {apt.time
+                              ? typeof apt.time === "string"
+                                ? apt.time
+                                : typeof apt.time === "object" && apt.time !== null
+                                  ? `${String((apt.time as any).hours || 0).padStart(
+                                      2,
+                                      "0"
+                                    )}:${String(
+                                      (apt.time as any).minutes || 0
+                                    ).padStart(2, "0")}`
+                                  : "Saat belirtilmemiş"
+                              : "Saat belirtilmemiş"}
+                          </p>
+
+                          {apt.note && (
+                            <p className="text-sm text-slate-500 italic">
+                              Not: {apt.note}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -317,12 +457,12 @@ const InstructorAppointmentManagement: React.FC = () => {
             </div>
           </section>
 
-          {/* SAĞ TARAF – DERS PROGRAMI */}
           <section className="lg:col-span-2 bg-white rounded-xl border p-4 shadow">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-sm font-semibold">
                 Haftalık Ders Programı
               </h2>
+
               <button
                 onClick={handleSaveSchedule}
                 disabled={savingSchedule}
@@ -332,8 +472,14 @@ const InstructorAppointmentManagement: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-6 text-xs gap-1">
+            <p className="mb-3 text-xs text-slate-600 leading-snug">
+              Boş kutucuklarda basılı tutup sürükleyerek seçim yapın veya
+              seçimi kaldırın. Ders kodunu ilgili alana yazın.
+            </p>
+
+            <div className="grid grid-cols-6 text-xs gap-1 select-none">
               <div />
+
               {days.map((d) => (
                 <div key={d} className="text-center font-medium">
                   {d}
@@ -342,23 +488,55 @@ const InstructorAppointmentManagement: React.FC = () => {
 
               {times.map((t) => (
                 <React.Fragment key={t}>
-                  <div className="text-right pr-2 text-[11px] whitespace-nowrap min-w-[88px]">
+                  <div className="text-right pr-2 text-[11px] whitespace-nowrap min-w-[88px] flex items-center justify-end">
                     {t}
                   </div>
+
                   {days.map((d) => {
                     const key = `${d}-${t}`;
-                    const active = selectedSlots.includes(key);
+                    const cell = scheduleSlots.find((s) => s.slot === key);
+                    const active = !!cell;
 
                     return (
-                      <button
+                      <div
                         key={key}
-                        onClick={() => toggleSlot(key)}
-                        className={`h-6 rounded border transition
-                        ${active
-                            ? "bg-[#d71920] border-[#d71920]"
-                            : "bg-slate-100 hover:bg-slate-200"
-                          }`}
-                      />
+                        role="button"
+                        tabIndex={0}
+                        onMouseDown={(e) => onSlotPointerDown(e, key)}
+                        onMouseEnter={() => onSlotMouseEnter(key)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSlotSimple(key);
+                          }
+                        }}
+                        className={`rounded border transition px-0.5 py-0.5 flex flex-col justify-center overflow-hidden cursor-pointer ${
+                          active
+                            ? "min-h-[2.75rem] bg-red-600 border-red-700 shadow-inner"
+                            : "min-h-[2.125rem] bg-slate-100 hover:bg-slate-200 border-slate-200"
+                        }`}
+                      >
+                        {active ? (
+                          <input
+                            type="text"
+                            inputMode="text"
+                            autoComplete="off"
+                            placeholder="Kod"
+                            title={cell?.courseCode || undefined}
+                            value={cell?.courseCode ?? ""}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) =>
+                              updateSlotCourseCode(key, e.target.value)
+                            }
+                            className="w-full min-w-0 max-w-full box-border text-[13px] font-semibold leading-none text-center px-1 py-0.5 rounded border border-red-900/35 bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:ring-1 focus:ring-white overflow-hidden text-ellipsis"
+                          />
+                        ) : (
+                          <span className="text-[transparent] select-none pointer-events-none text-xs">
+                            –
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                 </React.Fragment>

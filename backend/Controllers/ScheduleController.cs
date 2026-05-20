@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApiProject.Models.DTOs;
 using ApiProject.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +21,7 @@ public class ScheduleController : ControllerBase
     }
 
     [HttpGet("my-schedule")]
-    public async Task<ActionResult<List<ScheduleSlotResponseDto>>> GetMySchedule()
+    public async Task<ActionResult<List<ScheduleCellDto>>> GetMySchedule()
     {
         try
         {
@@ -32,7 +33,7 @@ public class ScheduleController : ControllerBase
             if (!string.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase))
                 return Forbid("Bu işlem sadece öğretmenler için geçerlidir.");
 
-            var schedule = await _scheduleService.GetScheduleByInstructorEmailAsync(userEmail);
+            var schedule = await _scheduleService.GetMyScheduleAsync(userEmail);
             return Ok(schedule);
         }
         catch (Exception ex)
@@ -74,6 +75,12 @@ public class ScheduleController : ControllerBase
             var userId = GetCurrentUserId();
             if (!userId.HasValue)
                 return Unauthorized("Kullanıcı ID bulunamadı");
+
+            _logger.LogInformation(
+                "SaveSchedule request JSON: {Json}",
+                JsonSerializer.Serialize(
+                    dto,
+                    new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
 
             await _scheduleService.SaveScheduleAsync(userId.Value, dto);
             return Ok(new { message = "Ders programı başarıyla kaydedildi" });

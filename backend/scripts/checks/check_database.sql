@@ -108,24 +108,17 @@ SELECT
         ELSE '❌ HATA: start_time kolonu YOK'
     END AS durum;
 
--- course_name kontrolü (NOT NULL olmalı)
+-- course_code kontrolü (EF / API ile uyum; NULL olabilir)
 SELECT 
-    'instructor_schedule - course_name Kontrolü' AS kontrol,
+    'instructor_schedule - course_code Kontrolü' AS kontrol,
     CASE 
         WHEN EXISTS (
             SELECT 1 
             FROM information_schema.columns 
             WHERE table_name = 'instructor_schedule' 
-            AND column_name = 'course_name'
-            AND is_nullable = 'NO'
-        ) THEN '✅ OK: course_name NOT NULL'
-        WHEN EXISTS (
-            SELECT 1 
-            FROM information_schema.columns 
-            WHERE table_name = 'instructor_schedule' 
-            AND column_name = 'course_name'
-        ) THEN '❌ HATA: course_name NULL olabilir (NOT NULL olmalı)'
-        ELSE '❌ HATA: course_name kolonu YOK'
+            AND column_name = 'course_code'
+        ) THEN '✅ OK: course_code kolonu var'
+        ELSE '❌ HATA: course_code kolonu YOK'
     END AS durum;
 
 -- ============================================

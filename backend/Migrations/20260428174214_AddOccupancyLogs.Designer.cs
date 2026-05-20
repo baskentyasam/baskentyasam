@@ -3,6 +3,7 @@ using System;
 using ApiProject.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ApiProject.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428174214_AddOccupancyLogs")]
+    partial class AddOccupancyLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -78,9 +81,10 @@ namespace ApiProject.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("CourseCode")
+                    b.Property<string>("CourseName")
+                        .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("course_code");
+                        .HasColumnName("course_name");
 
                     b.Property<int>("DayOfWeek")
                         .HasColumnType("integer")
@@ -204,43 +208,6 @@ namespace ApiProject.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("OccupancyLogs", (string)null);
-                });
-
-            modelBuilder.Entity("ApiProject.Models.OccupancySensorEvent", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("FromTime")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("InCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("OutCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("ReceivedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<DateTime>("ToTime")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("ZoneName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ZoneName", "ReceivedAt");
-
-                    b.ToTable("OccupancySensorEvents", (string)null);
                 });
 
             modelBuilder.Entity("ApiProject.Models.Order", b =>
@@ -379,33 +346,11 @@ namespace ApiProject.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ClassLevel")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("class_level");
-
-                    b.Property<string>("Courses")
-                        .HasColumnType("text")
-                        .HasColumnName("courses");
-
-                    b.Property<string>("Department")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("department");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("email");
-
-                    b.Property<DateTime?>("FirstLoginAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("first_login_at");
-
-                    b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("last_login_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -419,24 +364,10 @@ namespace ApiProject.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_hash");
 
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("phone_number");
-
-                    b.Property<string>("ProfileImage")
-                        .HasColumnType("text")
-                        .HasColumnName("profile_image");
-
                     b.Property<int>("Role")
                         .HasMaxLength(50)
                         .HasColumnType("integer")
                         .HasColumnName("role_id");
-
-                    b.Property<string>("RoomNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("room_number");
 
                     b.Property<string>("StudentNo")
                         .HasMaxLength(50)
