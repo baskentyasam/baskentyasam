@@ -12,8 +12,6 @@ import CafeteriaOrderPage from "./pages/CafeteriaOrderPage";
 import MyOrdersPage from "./pages/MyOrdersPage";
 import CashierOrdersPage from "./pages/CashierOrdersPage";
 import LibraryOccupancyPage from "./pages/LibraryOccupancyPage";
-import ParkingOccupancyPage from "./pages/ParkingOccupancyPage";
-import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   return (
@@ -34,8 +32,6 @@ function App() {
         <Route path="/siparislerim" element={<MyOrdersPage />} />
         <Route path="/kasiyer/siparisler" element={<CashierOrdersPage />} />
         <Route path="/kutuphane" element={<LibraryOccupancyPage />} />
-        <Route path="/otopark" element={<ParkingOccupancyPage />} />
-        <Route path="/profil" element={<ProfilePage />} />
       </Routes>
     </Router>
   );

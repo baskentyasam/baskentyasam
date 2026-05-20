@@ -6,19 +6,8 @@ public class AppointmentResponseDto
     public int StudentId { get; set; }
     public string StudentName { get; set; } = string.Empty;
     public string? StudentNo { get; set; }
-    /// <summary>Öğrencinin bölümü (varsa). Hoca panelinde göstermek için.</summary>
-    public string? StudentDepartment { get; set; }
-    /// <summary>Öğrencinin sınıfı (varsa).</summary>
-    public string? StudentClassLevel { get; set; }
-    /// <summary>Öğrencinin profil fotoğrafı (varsa, base64).</summary>
-    public string? StudentProfileImage { get; set; }
     public int TeacherId { get; set; }
     public string TeacherName { get; set; } = string.Empty;
-    public string? TeacherProfileImage { get; set; }
-    /// <summary>Öğretim elemanının oda numarası (öğrenci panelinde göstermek için).</summary>
-    public string? TeacherRoomNumber { get; set; }
-    /// <summary>Öğretim elemanının bölümü.</summary>
-    public string? TeacherDepartment { get; set; }
     public DateTime Date { get; set; }
     public TimeSpan Time { get; set; }
     public string Subject { get; set; } = string.Empty;

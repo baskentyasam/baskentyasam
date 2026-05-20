@@ -352,15 +352,10 @@ const CafeteriaOrderPage: React.FC = () => {
   };
 
   const getTimeOptions = () => {
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
     const options: string[] = [];
     for (let h = 9; h <= 17; h++) {
       for (const m of [0, 30]) {
         if (h === 17 && m === 30) break;
-        const slotMinutes = h * 60 + m;
-        if (slotMinutes <= currentMinutes) continue;
         options.push(
           `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`,
         );

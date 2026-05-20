@@ -35,16 +35,6 @@ export interface Appointment {
   note?: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
-  // Öğrenci ek bilgileri (öğretim elemanı paneli için)
-  studentName?: string;
-  studentNo?: string | null;
-  studentDepartment?: string | null;
-  studentClassLevel?: string | null;
-  studentProfileImage?: string | null;
-  teacherName?: string;
-  teacherProfileImage?: string | null;
-  teacherRoomNumber?: string | null;
-  teacherDepartment?: string | null;
 }
 
 export interface ApiError {
@@ -61,14 +51,7 @@ const mapDtoToAppointment = (dto: any): Appointment => {
     course: dto.subject || dto.Subject || dto.course || '',
     note: dto.note || dto.rejectionReason || dto.RejectionReason,
     studentName: dto.studentName || dto.StudentName,
-    studentNo: dto.studentNo ?? dto.StudentNo ?? null,
-    studentDepartment: dto.studentDepartment ?? dto.StudentDepartment ?? null,
-    studentClassLevel: dto.studentClassLevel ?? dto.StudentClassLevel ?? null,
-    studentProfileImage: dto.studentProfileImage ?? dto.StudentProfileImage ?? null,
     teacherName: dto.teacherName || dto.TeacherName,
-    teacherProfileImage: dto.teacherProfileImage ?? dto.TeacherProfileImage ?? null,
-    teacherRoomNumber: dto.teacherRoomNumber ?? dto.TeacherRoomNumber ?? null,
-    teacherDepartment: dto.teacherDepartment ?? dto.TeacherDepartment ?? null,
     date: dto.date || dto.Date,
     time: dto.time || dto.Time,
     status: dto.status || dto.Status,

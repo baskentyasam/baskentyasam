@@ -18,13 +18,3 @@ public class ResetPasswordRequestDto
     [MinLength(6, ErrorMessage = "Şifre en az 6 karakter olmalıdır.")]
     public string NewPassword { get; set; } = string.Empty;
 }
-
-public class ChangePasswordDto
-{
-    [Required(ErrorMessage = "Mevcut şifre gereklidir.")]
-    public string CurrentPassword { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Yeni şifre gereklidir.")]
-    [MinLength(6, ErrorMessage = "Şifre en az 6 karakter olmalıdır.")]
-    public string NewPassword { get; set; } = string.Empty;
-}

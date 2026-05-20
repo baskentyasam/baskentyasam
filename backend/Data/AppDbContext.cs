@@ -17,8 +17,6 @@ namespace ApiProject.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<InstructorSchedule> InstructorSchedules { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
-        public DbSet<OccupancyLog> OccupancyLogs { get; set; }
-        public DbSet<OccupancySensorEvent> OccupancySensorEvents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,19 +31,6 @@ namespace ApiProject.Data
             modelBuilder.Entity<Notification>().ToTable("Notifications");
             modelBuilder.Entity<InstructorSchedule>().ToTable("instructor_schedule");
             modelBuilder.Entity<PasswordResetToken>().ToTable("password_reset_tokens");
-            modelBuilder.Entity<OccupancyLog>().ToTable("OccupancyLogs");
-            modelBuilder.Entity<OccupancySensorEvent>().ToTable("OccupancySensorEvents");
-
-            modelBuilder.Entity<OccupancyLog>(entity =>
-            {
-                entity.Property(e => e.LogTime).HasDefaultValueSql("NOW()");
-            });
-
-            modelBuilder.Entity<OccupancySensorEvent>(entity =>
-            {
-                entity.Property(e => e.ReceivedAt).HasDefaultValueSql("NOW()");
-                entity.HasIndex(e => new { e.ZoneName, e.ReceivedAt });
-            });
 
             modelBuilder.Entity<PasswordResetToken>(entity =>
             {
@@ -81,16 +66,6 @@ namespace ApiProject.Data
                 // login_type kolonu PostgreSQL ENUM tipi olduğu için Entity Framework ile uyumsuz
                 // Bu alanı ignore edip, ham SQL ile güncelleyeceğiz
                 entity.Ignore(e => e.LoginType);
-
-                // Yeni profil alanları
-                entity.Property(e => e.ProfileImage).HasColumnName("profile_image");
-                entity.Property(e => e.Department).HasColumnName("department");
-                entity.Property(e => e.RoomNumber).HasColumnName("room_number");
-                entity.Property(e => e.PhoneNumber).HasColumnName("phone_number");
-                entity.Property(e => e.ClassLevel).HasColumnName("class_level");
-                entity.Property(e => e.Courses).HasColumnName("courses");
-                entity.Property(e => e.FirstLoginAt).HasColumnName("first_login_at");
-                entity.Property(e => e.LastLoginAt).HasColumnName("last_login_at");
             });
 
             // Appointment entity column mappings - snake_case kolon adları
@@ -151,9 +126,7 @@ namespace ApiProject.Data
                 entity.Property(e => e.InstructorId).HasColumnName("instructor_id");
                 entity.Property(e => e.DayOfWeek).HasColumnName("day_of_week");
                 entity.Property(e => e.StartTime).HasColumnName("start_time");
-                entity.Property(e => e.CourseCode)
-                    .HasColumnName("course_code")
-                    .IsRequired(false);
+                entity.Property(e => e.CourseName).HasColumnName("course_name");
                 
                 entity.HasOne(s => s.Instructor)
                     .WithMany()

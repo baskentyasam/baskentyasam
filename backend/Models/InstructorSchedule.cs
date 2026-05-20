@@ -6,8 +6,9 @@ public class InstructorSchedule
     public int InstructorId { get; set; }
     public int DayOfWeek { get; set; } // 1=Pazartesi, 2=Salı, ..., 5=Cuma
     public TimeSpan StartTime { get; set; }
-    public string? CourseCode { get; set; }
-
+    public string CourseName { get; set; } = string.Empty;
+    
     // Navigation property
     public User? Instructor { get; set; }
 }
+

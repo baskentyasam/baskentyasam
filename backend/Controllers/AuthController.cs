@@ -2,10 +2,8 @@ using ApiProject.Models.DTOs;
 using ApiProject.Services;
 using ApiProject.Data;
 using ApiProject.Models;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace ApiProject.Controllers;
 
@@ -193,158 +191,6 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Oturum açmış kullanıcının profil bilgilerini döndürür (ad, e-posta, rol).
-    /// </summary>
-    [HttpGet("me")]
-    [Authorize]
-    public async Task<ActionResult> GetMyProfile()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new { message = "Geçersiz oturum." });
-
-        var user = await _authService.GetUserByIdAsync(userId);
-        if (user == null)
-            return NotFound(new { message = "Kullanıcı bulunamadı." });
-
-        return Ok(new
-        {
-            id = user.Id,
-            name = user.Name,
-            email = user.Email,
-            role = user.Role.ToString(),
-            studentNo = user.StudentNo,
-            profileImage = user.ProfileImage,
-            department = user.Department,
-            roomNumber = user.RoomNumber,
-            phoneNumber = user.PhoneNumber,
-            classLevel = user.ClassLevel,
-            courses = user.Courses,
-            firstLoginAt = user.FirstLoginAt,
-            lastLoginAt = user.LastLoginAt
-        });
-    }
-
-    /// <summary>
-    /// Oturum açmış kullanıcının profil bilgilerini günceller.
-    /// (Rol/şifre değiştirilmez. Bölüm, oda, telefon, sınıf ve profil fotoğrafı düzenlenebilir.)
-    /// </summary>
-    [HttpPut("me")]
-    [Authorize]
-    public async Task<ActionResult> UpdateMyProfile([FromBody] UpdateProfileDto dto)
-    {
-        if (dto == null)
-            return BadRequest(new { message = "İstek gövdesi boş olamaz." });
-
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new { message = "Geçersiz oturum." });
-
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user == null)
-            return NotFound(new { message = "Kullanıcı bulunamadı." });
-
-        // Profil fotoğrafı: data URL (base64) bekleniyor; çok büyükse reddet (~2.5 MB)
-        if (dto.ProfileImage != null)
-        {
-            if (dto.ProfileImage.Length > 0 && dto.ProfileImage.Length > 3_500_000)
-            {
-                return BadRequest(new { message = "Profil fotoğrafı çok büyük (en fazla ~2.5 MB)." });
-            }
-            user.ProfileImage = string.IsNullOrWhiteSpace(dto.ProfileImage) ? null : dto.ProfileImage;
-        }
-
-        if (dto.Department != null)
-            user.Department = string.IsNullOrWhiteSpace(dto.Department) ? null : dto.Department.Trim();
-
-        if (dto.RoomNumber != null)
-            user.RoomNumber = string.IsNullOrWhiteSpace(dto.RoomNumber) ? null : dto.RoomNumber.Trim();
-
-        if (dto.PhoneNumber != null)
-            user.PhoneNumber = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : dto.PhoneNumber.Trim();
-
-        if (dto.ClassLevel != null)
-            user.ClassLevel = string.IsNullOrWhiteSpace(dto.ClassLevel) ? null : dto.ClassLevel.Trim();
-
-        if (dto.StudentNo != null)
-            user.StudentNo = string.IsNullOrWhiteSpace(dto.StudentNo) ? null : dto.StudentNo.Trim();
-
-        if (dto.Courses != null)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Courses))
-            {
-                user.Courses = null;
-            }
-            else
-            {
-                // Tekrarları temizle, normalize et
-                var cleaned = dto.Courses
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Where(s => !string.IsNullOrWhiteSpace(s))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-                user.Courses = cleaned.Length > 0 ? string.Join(", ", cleaned) : null;
-            }
-        }
-
-        try
-        {
-            await _context.SaveChangesAsync();
-            return Ok(new
-            {
-                message = "Profil bilgileri güncellendi.",
-                id = user.Id,
-                name = user.Name,
-                email = user.Email,
-                role = user.Role.ToString(),
-                studentNo = user.StudentNo,
-                profileImage = user.ProfileImage,
-                department = user.Department,
-                roomNumber = user.RoomNumber,
-                phoneNumber = user.PhoneNumber,
-                classLevel = user.ClassLevel,
-                courses = user.Courses,
-                firstLoginAt = user.FirstLoginAt,
-                lastLoginAt = user.LastLoginAt
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = "Profil güncellenirken bir hata oluştu.", error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Oturum açmış kullanıcının mevcut şifresini doğrulayıp yeni şifreyle değiştirir.
-    /// </summary>
-    [HttpPost("change-password")]
-    [Authorize]
-    public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
-    {
-        if (dto == null)
-            return BadRequest(new { message = "İstek gövdesi boş olamaz." });
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new { message = "Geçersiz oturum." });
-
-        try
-        {
-            var (success, error) = await _authService.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
-            if (!success)
-                return BadRequest(new { message = error ?? "Şifre değiştirilemedi." });
-
-            return Ok(new { message = "Şifreniz başarıyla güncellendi." });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = "Şifre değiştirilirken bir hata oluştu.", error = ex.Message });
-        }
-    }
-
-    /// <summary>
     /// Tüm kullanıcıları listeler (Email ve şifre gösterilmez)
     /// </summary>
     [HttpGet("users")]
@@ -372,45 +218,23 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Tüm öğretmenleri listeler. Opsiyonel: bölüm filtresi ve ad ön-eki ile arama.
-    /// Profil fotoğrafı, bölüm ve verdiği dersler dahil edilir.
+    /// Tüm öğretmenleri listeler
     /// </summary>
     [HttpGet("teachers")]
-    public async Task<ActionResult> GetAllTeachers([FromQuery] string? department = null, [FromQuery] string? search = null)
+    public async Task<ActionResult<List<UserResponseDto>>> GetAllTeachers()
     {
         try
         {
-            var query = _context.Users.Where(u => u.Role == UserRole.Teacher);
-
-            if (!string.IsNullOrWhiteSpace(department))
-            {
-                var dep = department.Trim().ToLower();
-                query = query.Where(u => u.Department != null && u.Department.ToLower() == dep);
-            }
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var prefix = search.Trim().ToLower();
-                // Ad veya soyaddan birinin baş kısmı ile eşleşsin
-                query = query.Where(u =>
-                    u.Name.ToLower().StartsWith(prefix) ||
-                    u.Name.ToLower().Contains(" " + prefix));
-            }
-
-            var teachers = await query
-                .OrderBy(u => u.Name)
-                .Select(u => new
+            var teachers = await _context.Users
+                .Where(u => u.Role == UserRole.Teacher)
+                .Select(u => new UserResponseDto
                 {
-                    id = u.Id,
-                    name = u.Name,
-                    role = u.Role.ToString(),
-                    studentNo = u.StudentNo,
-                    department = u.Department,
-                    roomNumber = u.RoomNumber,
-                    phoneNumber = u.PhoneNumber,
-                    profileImage = u.ProfileImage,
-                    courses = u.Courses
+                    Id = u.Id,
+                    Name = u.Name,
+                    Role = u.Role.ToString(),
+                    StudentNo = u.StudentNo
                 })
+                .OrderBy(u => u.Name)
                 .ToListAsync();
 
             return Ok(teachers);
@@ -418,56 +242,6 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = "Öğretmenler getirilirken bir hata oluştu.", error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Öğretim elemanlarının kayıtlı bölümlerinin listesini döner (distinct).
-    /// </summary>
-    [HttpGet("departments")]
-    public async Task<ActionResult<List<string>>> GetTeacherDepartments()
-    {
-        try
-        {
-            var departments = await _context.Users
-                .Where(u => u.Role == UserRole.Teacher && u.Department != null && u.Department != "")
-                .Select(u => u.Department!)
-                .Distinct()
-                .OrderBy(d => d)
-                .ToListAsync();
-
-            return Ok(departments);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = "Bölümler getirilirken bir hata oluştu.", error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Belirli bir öğretim elemanının verdiği dersleri liste olarak döner.
-    /// </summary>
-    [HttpGet("teachers/{id}/courses")]
-    public async Task<ActionResult<List<string>>> GetTeacherCourses(int id)
-    {
-        try
-        {
-            var teacher = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && u.Role == UserRole.Teacher);
-
-            if (teacher == null)
-                return NotFound(new { message = "Öğretim elemanı bulunamadı." });
-
-            var coursesList = (teacher.Courses ?? string.Empty)
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .ToList();
-
-            return Ok(coursesList);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = "Dersler getirilirken bir hata oluştu.", error = ex.Message });
         }
     }
 

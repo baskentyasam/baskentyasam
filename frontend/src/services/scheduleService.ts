@@ -1,23 +1,23 @@
 import apiClient from '../api/axios';
 
-/** Öğretim elemanı program hücresi (slot anahtarı + opsiyonel ders kodu) */
-export type ScheduleCell = {
-  slot: string;
-  courseCode?: string;
-};
-
-/** Öğrenci tarafı: müsaitlik (dayOfWeek + startTime); courseCode isteğe bağlı. */
 export interface ScheduleSlot {
   id?: number;
   dayOfWeek: number;
   startTime: string;
-  courseCode?: string;
-  slot: string;
+  courseName: string;
+  slot: string; // Format: "Pzt-09.00-09.50"
 }
 
-export const getMySchedule = async (): Promise<ScheduleCell[]> => {
+export interface SaveScheduleRequest {
+  slots: Array<{
+    slot: string;
+    courseName?: string;
+  }>;
+}
+
+export const getMySchedule = async (): Promise<ScheduleSlot[]> => {
   try {
-    const response = await apiClient.get<ScheduleCell[]>("/Schedule/my-schedule");
+    const response = await apiClient.get("/Schedule/my-schedule");
     return response.data;
   } catch (error: any) {
     console.error("Ders programı yükleme hatası:", error);
@@ -28,16 +28,15 @@ export const getMySchedule = async (): Promise<ScheduleCell[]> => {
   }
 };
 
-export const saveSchedule = async (slots: ScheduleCell[]): Promise<void> => {
+export const saveSchedule = async (slots: string[]): Promise<void> => {
   try {
-    await apiClient.post("/Schedule/save", {
-      slots: slots.map((cell) => ({
-        slot: cell.slot,
-        courseCode: cell.courseCode?.trim()
-          ? cell.courseCode.trim()
-          : null,
+    const request: SaveScheduleRequest = {
+      slots: slots.map((slot) => ({
+        slot,
+        courseName: "", // İsteğe bağlı: ders adı eklenebilir
       })),
-    });
+    };
+    await apiClient.post("/Schedule/save", request);
   } catch (error: any) {
     console.error("Ders programı kaydetme hatası:", error);
     throw {
@@ -56,3 +55,4 @@ export const getInstructorSchedule = async (instructorId: number): Promise<Sched
     return [];
   }
 };
+

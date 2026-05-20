@@ -24,10 +24,6 @@ public interface IAuthService
     Task RequestPasswordResetAsync(string email);
     /// <summary>Geçerli token ile şifreyi günceller; token tek kullanımlıktır.</summary>
     Task<bool> ResetPasswordWithTokenAsync(string plainToken, string newPassword);
-    /// <summary>Oturum açmış kullanıcının mevcut şifresini doğrulayıp yeni şifreyle değiştirir.</summary>
-    Task<(bool Success, string? Error)> ChangePasswordAsync(int userId, string currentPassword, string newPassword);
-    /// <summary>Verilen ID'ye sahip kullanıcının temel profil bilgilerini döndürür.</summary>
-    Task<User?> GetUserByIdAsync(int userId);
 }
 
 public class AuthService : IAuthService
@@ -79,47 +75,29 @@ public class AuthService : IAuthService
         {
             try
             {
-                // ExecuteSqlRaw yerine doğrudan bağlantı üzerinden scalar değer okuyalım.
-                // ÖNEMLİ: _context.Database.GetDbConnection() EF Core'un paylaşımlı
-                // bağlantısını döner; dispose ETMEMELİYİZ aksi takdirde sonraki
-                // EF işlemleri ObjectDisposedException ile patlar.
-                var connection = _context.Database.GetDbConnection();
-                var wasClosed = connection.State != System.Data.ConnectionState.Open;
-                if (wasClosed)
-                {
-                    await connection.OpenAsync();
-                }
-
-                string loginTypeString;
-                try
-                {
-                    using var command = connection.CreateCommand();
-                    command.CommandText = "SELECT login_type::text FROM users WHERE id = @userId";
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = "@userId";
-                    parameter.Value = user.Id;
-                    command.Parameters.Add(parameter);
-
-                    var loginType = await command.ExecuteScalarAsync();
-                    loginTypeString = loginType?.ToString() ?? string.Empty;
-                }
-                finally
-                {
-                    if (wasClosed && connection.State == System.Data.ConnectionState.Open)
-                    {
-                        await connection.CloseAsync();
-                    }
-                }
-
+                // ExecuteSqlRaw yerine doğrudan bağlantı üzerinden scalar değer okuyalım
+                using var connection = _context.Database.GetDbConnection();
+                await connection.OpenAsync();
+                
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT login_type::text FROM users WHERE id = @userId";
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = "@userId";
+                parameter.Value = user.Id;
+                command.Parameters.Add(parameter);
+                
+                var loginType = await command.ExecuteScalarAsync();
+                var loginTypeString = loginType?.ToString() ?? string.Empty;
+                
                 _logger.LogInformation($"Login attempt - UserId: {user.Id}, Email: {user.Email}, LoginType: '{loginTypeString}'");
-
+                
                 // login_type NULL veya boş ise doğrulanmamış demektir
                 if (string.IsNullOrWhiteSpace(loginTypeString))
                 {
                     _logger.LogWarning($"Email doğrulanmamış kullanıcı giriş denemesi: {user.Email}");
                     throw new UnauthorizedAccessException("Lütfen e-posta adresinizi doğrulayın. Kayıt sırasında gönderilen e-postadaki linke tıklayınız.");
                 }
-
+                
                 _logger.LogInformation($"Email doğrulaması başarılı: {user.Email}");
             }
             catch (UnauthorizedAccessException)
@@ -148,34 +126,6 @@ public class AuthService : IAuthService
         if (userRoleFromDb != loginDto.Role)
         {
             throw new UnauthorizedAccessException("Seçilen rol ile kullanıcı rolü eşleşmiyor.");
-        }
-
-        // İlk/son erişim zamanlarını güncelle (raw SQL ile, EF change tracker'a
-        // bağlı kalmadan; böylece üstteki ham bağlantı kullanımının yan etkilerinden
-        // etkilenmez)
-        try
-        {
-            var now = DateTime.UtcNow;
-            user.LastLoginAt = now;
-            if (user.FirstLoginAt == null)
-            {
-                user.FirstLoginAt = now;
-                await _context.Database.ExecuteSqlRawAsync(
-                    "UPDATE users SET first_login_at = {0}, last_login_at = {0} WHERE id = {1}",
-                    now, user.Id);
-            }
-            else
-            {
-                await _context.Database.ExecuteSqlRawAsync(
-                    "UPDATE users SET last_login_at = {0} WHERE id = {1}",
-                    now, user.Id);
-            }
-            _logger.LogInformation("Erişim zamanı güncellendi: UserId={UserId}, LastLogin={LastLogin}", user.Id, now);
-        }
-        catch (Exception ex)
-        {
-            // Giriş akışını bozmamak için sessizce logla
-            _logger.LogWarning(ex, "Erişim zamanı güncellenemedi: UserId={UserId}", user.Id);
         }
 
         var token = GenerateJwtToken(user);
@@ -483,35 +433,6 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
         _logger.LogInformation("Şifre sıfırlama başarılı: UserId={UserId}", row.UserId);
         return true;
-    }
-
-    public async Task<(bool Success, string? Error)> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
-    {
-        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
-            return (false, "Mevcut ve yeni şifre gereklidir.");
-
-        if (newPassword.Length < 6)
-            return (false, "Yeni şifre en az 6 karakter olmalıdır.");
-
-        if (currentPassword == newPassword)
-            return (false, "Yeni şifre mevcut şifreden farklı olmalıdır.");
-
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user == null)
-            return (false, "Kullanıcı bulunamadı.");
-
-        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
-            return (false, "Mevcut şifre hatalı.");
-
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Şifre değiştirildi: UserId={UserId}", userId);
-        return (true, null);
-    }
-
-    public async Task<User?> GetUserByIdAsync(int userId)
-    {
-        return await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
     }
 
     private static string HashPasswordResetToken(string plain)
