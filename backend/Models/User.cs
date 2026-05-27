@@ -30,6 +30,15 @@ public class User
     
     [MaxLength(50)]
     public string? LoginType { get; set; }
+
+    public bool IsActive { get; set; } = true;
+
+    public int? DepartmentId { get; set; }
+
+    public bool IsVisibleForAppointment { get; set; } = true;
+
+    [ForeignKey(nameof(DepartmentId))]
+    public virtual Department? Department { get; set; }
     
     // Navigation Properties
     public virtual ICollection<Appointment> StudentAppointments { get; set; } = new List<Appointment>();
@@ -42,5 +51,7 @@ public enum UserRole
     Student = 0,
     Teacher = 1,
     Staff = 2,
-    Admin = 3
+    Admin = 3,
+    SuperAdmin = 4,
+    SubAdmin = 5
 }

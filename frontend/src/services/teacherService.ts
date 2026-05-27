@@ -12,10 +12,13 @@ export interface ApiError {
   status?: number;
 }
 
-// Öğretmen listesini getir
-export const getTeachers = async (): Promise<Teacher[]> => {
+// Öğretmen listesini getir (opsiyonel fakülte/bölüm filtresi)
+export const getTeachers = async (params?: {
+  facultyId?: number;
+  departmentId?: number;
+}): Promise<Teacher[]> => {
   try {
-    const response = await apiClient.get<Teacher[]>('/Auth/teachers');
+    const response = await apiClient.get<Teacher[]>('/Auth/teachers', { params });
     return response.data;
   } catch (error: any) {
     throw {

@@ -133,6 +133,11 @@ try
     builder.Services.AddScoped<IEmailService, EmailService>(); // Email Service eklendi
     builder.Services.AddScoped<ICafeService, CafeService>();
     builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
+    builder.Services.AddScoped<IAdminAuthorizationService, AdminAuthorizationService>();
+    builder.Services.AddScoped<ISubAdminManagementService, SubAdminManagementService>();
+    builder.Services.AddScoped<IDirectoryService, DirectoryService>();
+    builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+    builder.Services.AddScoped<IAdminAppointmentManagementService, AdminAppointmentManagementService>();
     builder.Services.AddScoped<ScheduleService>();
 
     // Background Service

@@ -14,6 +14,10 @@ public class CreateOrderItemDto
 
 public class CreateOrderDto
 {
+    [Required(ErrorMessage = "Kafeterya seçimi gereklidir")]
+    [Range(1, int.MaxValue, ErrorMessage = "Geçerli bir kafeterya seçmelisiniz")]
+    public int CafeteriaId { get; set; }
+
     [Required(ErrorMessage = "Sipariş öğeleri gereklidir")]
     [MinLength(1, ErrorMessage = "En az bir ürün seçmelisiniz")]
     public List<CreateOrderItemDto> OrderItems { get; set; } = new();

@@ -19,27 +19,44 @@ public class CashierOrdersController : ControllerBase
     }
 
     [HttpGet("unpaid-risk-overview")]
-    public async Task<ActionResult<CashierUnpaidRiskOverviewDto>> GetUnpaidRiskOverview()
+    public async Task<ActionResult<CashierUnpaidRiskOverviewDto>> GetUnpaidRiskOverview([FromQuery] int? cafeteriaId)
     {
-        var data = await _orderManagementService.GetCashierUnpaidRiskOverviewAsync();
+        if (cafeteriaId.HasValue && cafeteriaId.Value <= 0)
+            return BadRequest(new { message = "Geçersiz kafeterya." });
+        if (cafeteriaId.HasValue && !await _orderManagementService.CafeteriaExistsAsync(cafeteriaId.Value))
+            return BadRequest(new { message = "Kafeterya bulunamadı." });
+
+        var data = await _orderManagementService.GetCashierUnpaidRiskOverviewAsync(cafeteriaId);
         return Ok(data);
     }
 
     [HttpGet("unpaid-by-user")]
-    public async Task<ActionResult<List<OrderResponseDto>>> GetUnpaidByUser([FromQuery] int userId)
+    public async Task<ActionResult<List<OrderResponseDto>>> GetUnpaidByUser(
+        [FromQuery] int userId,
+        [FromQuery] int? cafeteriaId)
     {
         if (userId <= 0) return BadRequest(new { message = "Geçerli bir kullanıcı seçin." });
-        var list = await _orderManagementService.GetOpenNotPaidOrdersForUserAsync(userId);
+        if (cafeteriaId.HasValue && cafeteriaId.Value <= 0)
+            return BadRequest(new { message = "Geçersiz kafeterya." });
+        if (cafeteriaId.HasValue && !await _orderManagementService.CafeteriaExistsAsync(cafeteriaId.Value))
+            return BadRequest(new { message = "Kafeterya bulunamadı." });
+
+        var list = await _orderManagementService.GetOpenNotPaidOrdersForUserAsync(userId, cafeteriaId);
         return Ok(list);
     }
 
     [HttpPost("settle-all-unpaid")]
-    public async Task<ActionResult> SettleAllUnpaid([FromQuery] int userId)
+    public async Task<ActionResult> SettleAllUnpaid([FromQuery] int userId, [FromQuery] int? cafeteriaId)
     {
         if (userId <= 0) return BadRequest(new { message = "Geçerli bir kullanıcı seçin." });
+        if (cafeteriaId.HasValue && cafeteriaId.Value <= 0)
+            return BadRequest(new { message = "Geçersiz kafeterya." });
+        if (cafeteriaId.HasValue && !await _orderManagementService.CafeteriaExistsAsync(cafeteriaId.Value))
+            return BadRequest(new { message = "Kafeterya bulunamadı." });
+
         try
         {
-            var n = await _orderManagementService.SettleAllUnpaidDebtsForUserAsync(userId);
+            var n = await _orderManagementService.SettleAllUnpaidDebtsForUserAsync(userId, cafeteriaId);
             return Ok(new { settledCount = n, message = n > 0 ? $"{n} kayıt tahsil edildi." : "Açık borç yok." });
         }
         catch (Exception ex)
@@ -67,9 +84,15 @@ public class CashierOrdersController : ControllerBase
     public async Task<ActionResult> GetOrders(
         [FromQuery] OrderStatus? status,
         [FromQuery] bool? isPaid,
-        [FromQuery] string? userSearch)
+        [FromQuery] string? userSearch,
+        [FromQuery] int? cafeteriaId)
     {
-        var orders = await _orderManagementService.GetCashierOrdersAsync(status, isPaid, userSearch);
+        if (cafeteriaId.HasValue && cafeteriaId.Value <= 0)
+            return BadRequest(new { message = "Geçersiz kafeterya." });
+        if (cafeteriaId.HasValue && !await _orderManagementService.CafeteriaExistsAsync(cafeteriaId.Value))
+            return BadRequest(new { message = "Kafeterya bulunamadı." });
+
+        var orders = await _orderManagementService.GetCashierOrdersAsync(status, isPaid, userSearch, cafeteriaId);
         return Ok(orders);
     }
 

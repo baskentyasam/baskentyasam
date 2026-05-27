@@ -81,7 +81,10 @@ const StudentDashboard: React.FC = () => {
             </section>
 
             {/* Otopark */}
-            <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow hover:shadow-lg transition min-h-[150px] cursor-default">
+            <section
+              onClick={() => navigate("/otopark")}
+              className="bg-white rounded-2xl border border-slate-200 p-6 shadow hover:shadow-lg transition min-h-[150px] cursor-pointer"
+            >
               <h3 className="text-lg font-semibold text-slate-900 mb-2">
                 Otopark Durumu
               </h3>

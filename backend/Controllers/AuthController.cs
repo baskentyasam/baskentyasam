@@ -221,20 +221,35 @@ public class AuthController : ControllerBase
     /// Tüm öğretmenleri listeler
     /// </summary>
     [HttpGet("teachers")]
-    public async Task<ActionResult<List<UserResponseDto>>> GetAllTeachers()
+    public async Task<ActionResult<List<UserResponseDto>>> GetAllTeachers(
+        [FromQuery] int? facultyId,
+        [FromQuery] int? departmentId)
     {
         try
         {
-            var teachers = await _context.Users
-                .Where(u => u.Role == UserRole.Teacher)
+            var teachersQuery = _context.Users
+                .AsNoTracking()
+                .Where(u => u.Role == UserRole.Teacher && u.IsActive && u.IsVisibleForAppointment);
+
+            if (departmentId.HasValue)
+            {
+                teachersQuery = teachersQuery.Where(u => u.DepartmentId == departmentId.Value);
+            }
+            else if (facultyId.HasValue)
+            {
+                teachersQuery = teachersQuery.Where(u =>
+                    u.Department != null && u.Department.FacultyId == facultyId.Value);
+            }
+
+            var teachers = await teachersQuery
+                .OrderBy(u => u.Name)
                 .Select(u => new UserResponseDto
                 {
                     Id = u.Id,
                     Name = u.Name,
                     Role = u.Role.ToString(),
-                    StudentNo = u.StudentNo
+                    StudentNo = u.StudentNo,
                 })
-                .OrderBy(u => u.Name)
                 .ToListAsync();
 
             return Ok(teachers);

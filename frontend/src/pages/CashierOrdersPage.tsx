@@ -17,7 +17,10 @@ import {
   OrderResponseDto,
   OrderStatus,
 } from "../services/orderService";
+import { getActiveCafeterias, ActiveCafeteria } from "../services/cafeteriaService";
 import { getCurrentUser } from "../services/authService";
+
+type CafeteriaFilterValue = "ALL" | number;
 
 const CashierOrdersPage: React.FC = () => {
   const user = getCurrentUser();
@@ -36,8 +39,16 @@ const CashierOrdersPage: React.FC = () => {
   const [debtModalLoading, setDebtModalLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ordersPage, setOrdersPage] = useState(0);
+  const [activeCafeterias, setActiveCafeterias] = useState<ActiveCafeteria[]>([]);
+  const [cafeteriaFilter, setCafeteriaFilter] = useState<CafeteriaFilterValue>("ALL");
+  const [cafeteriaListError, setCafeteriaListError] = useState("");
 
   const isHistoryMode = debouncedSearch.trim().length >= 2;
+
+  const cafeteriaFilterParam = useMemo(
+    () => (cafeteriaFilter === "ALL" ? undefined : cafeteriaFilter),
+    [cafeteriaFilter],
+  );
   const unpaidLimit = riskOverview?.unpaidLimit ?? 3;
 
   const queryParams = useMemo(() => {
@@ -53,11 +64,24 @@ const CashierOrdersPage: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [searchDraft]);
 
+  useEffect(() => {
+    getActiveCafeterias()
+      .then(setActiveCafeterias)
+      .catch(() => setCafeteriaListError("Kafeteryalar yüklenemedi."));
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
+      setError("");
       const term = debouncedSearch.trim();
-      const params: { status?: OrderStatus; isPaid?: boolean; userSearch?: string } = {};
+      const params: {
+        status?: OrderStatus;
+        isPaid?: boolean;
+        userSearch?: string;
+        cafeteriaId?: number;
+      } = {};
+      if (cafeteriaFilterParam != null) params.cafeteriaId = cafeteriaFilterParam;
       if (term.length >= 2) {
         params.userSearch = term;
       } else {
@@ -65,23 +89,30 @@ const CashierOrdersPage: React.FC = () => {
       }
       const [data, risk] = await Promise.all([
         getCashierOrders(params),
-        getCashierUnpaidRiskOverview(),
+        getCashierUnpaidRiskOverview(
+          cafeteriaFilterParam != null ? { cafeteriaId: cafeteriaFilterParam } : undefined,
+        ),
       ]);
       setOrders(data);
       setRiskOverview(risk);
     } catch (e: any) {
-      setError(e?.message || "Siparişler getirilirken hata oluştu.");
+      setError(
+        e?.response?.data?.message || e?.message || "Siparişler getirilirken hata oluştu.",
+      );
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, queryParams]);
+  }, [debouncedSearch, queryParams, cafeteriaFilterParam]);
 
   const openDebtModal = async (userId: number) => {
     setDebtModalUserId(userId);
     setDebtModalLoading(true);
     setDebtModalOrders([]);
     try {
-      const list = await getCashierUnpaidByUser(userId);
+      const list = await getCashierUnpaidByUser(
+        userId,
+        cafeteriaFilterParam != null ? { cafeteriaId: cafeteriaFilterParam } : undefined,
+      );
       setDebtModalOrders(list);
     } catch {
       setError("Borç listesi yüklenemedi.");
@@ -110,11 +141,17 @@ const CashierOrdersPage: React.FC = () => {
   };
 
   const runSettleAll = async (userId: number) => {
-    if (!window.confirm("Bu kullanıcının tüm ödenmemiş kayıtlarını tahsil olarak kapatmak istiyor musunuz?"))
-      return;
+    const scopeMsg =
+      cafeteriaFilterParam != null
+        ? "Bu kullanıcının seçili kafeteryadaki ödenmemiş kayıtlarını tahsil olarak kapatmak istiyor musunuz?"
+        : "Bu kullanıcının tüm ödenmemiş kayıtlarını tahsil olarak kapatmak istiyor musunuz?";
+    if (!window.confirm(scopeMsg)) return;
     try {
       setError("");
-      const res = await cashierSettleAllUnpaid(userId);
+      const res = await cashierSettleAllUnpaid(
+        userId,
+        cafeteriaFilterParam != null ? { cafeteriaId: cafeteriaFilterParam } : undefined,
+      );
       setToast(res.message || "İşlem tamam.");
       window.setTimeout(() => setToast(null), 3500);
       closeDebtModal();
@@ -169,8 +206,12 @@ const CashierOrdersPage: React.FC = () => {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             {riskOverview && (
-              <div className="rounded-xl bg-white/15 border border-white/30 px-4 py-2 text-sm text-white">
-                <span className="font-semibold">Risk özeti:</span>{" "}
+              <div className="rounded-xl bg-white/15 border border-white/30 px-4 py-2 text-sm text-white max-w-md">
+                <span className="font-semibold">Risk özeti</span>
+                {cafeteriaFilter !== "ALL" && (
+                  <span className="opacity-90"> (seçili kafe)</span>
+                )}
+                :{" "}
                 <span className="font-mono">{riskOverview.usersAtOrOverLimit}</span> müşteri limitte ·{" "}
                 <span className="font-mono">{riskOverview.totalOpenNotPaidOrders}</span> açık ödenmedi
               </div>
@@ -218,6 +259,12 @@ const CashierOrdersPage: React.FC = () => {
                     ? "Geçmiş modu: aşağıda eşleşen kullanıcı(lar)a ait tüm siparişler (iptal ve ödendi dahil) listelenir. Filtreler bu modda devre dışı."
                     : "Arama boşken: bekleyen kasiyer kuyruğu ve seçili durum/ödeme filtreleri uygulanır."}
               </p>
+              {cafeteriaFilter !== "ALL" && !isHistoryMode && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2 leading-relaxed">
+                  Ödenmemiş sayıları seçili kafeteryaya göre gösterilir. Yeni teslim/ödenmedi işlemlerinde
+                  müşterinin tüm kafelerdeki toplam ödenmemiş limiti ({unpaidLimit} adet) geçerlidir.
+                </p>
+              )}
             </div>
 
             {isHistoryMode && (
@@ -235,7 +282,30 @@ const CashierOrdersPage: React.FC = () => {
             )}
 
             <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-            <div className="flex gap-3 flex-col sm:flex-row">
+            <div className="flex gap-3 flex-col sm:flex-row flex-wrap">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Kafeterya Seç
+                </label>
+                <select
+                  className="border rounded-lg px-3 py-2 text-sm min-w-[180px]"
+                  value={cafeteriaFilter === "ALL" ? "ALL" : String(cafeteriaFilter)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCafeteriaFilter(v === "ALL" ? "ALL" : Number(v));
+                  }}
+                >
+                  <option value="ALL">Tüm Kafeteryalar</option>
+                  {activeCafeterias.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {cafeteriaListError && (
+                  <p className="text-xs text-red-600 mt-1">{cafeteriaListError}</p>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
                 <select
@@ -360,6 +430,11 @@ const CashierOrdersPage: React.FC = () => {
                       <div>
                         <p className="text-sm text-slate-500">Sipariş No</p>
                         <p className="text-lg font-semibold text-slate-900">{o.orderNumber}</p>
+                        {o.cafeteriaName && (
+                          <p className="text-sm text-slate-600 mt-1">
+                            Kafeterya: <span className="font-medium">{o.cafeteriaName}</span>
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap justify-end">
                         <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-800">
@@ -554,6 +629,9 @@ const CashierOrdersPage: React.FC = () => {
                     >
                       <div>
                         <p className="font-mono font-medium text-slate-900">{row.orderNumber}</p>
+                        {row.cafeteriaName && (
+                          <p className="text-xs text-slate-600">{row.cafeteriaName}</p>
+                        )}
                         <p className="text-xs text-slate-500">
                           {new Date(row.createdAt).toLocaleString("tr-TR")}
                         </p>

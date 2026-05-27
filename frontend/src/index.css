@@ -1,5 +1,72 @@
 @tailwind base;
 @tailwind components;
+
+@layer components {
+  .admin-page-bg {
+    @apply bg-[#f4f7f9] min-h-screen;
+  }
+
+  .admin-card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-100;
+  }
+
+  .admin-card-body {
+    @apply p-6;
+  }
+
+  .admin-grid-3 {
+    @apply grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6;
+  }
+
+  .admin-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-[#d92128] hover:bg-[#c41a20] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors;
+  }
+
+  .admin-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors;
+  }
+
+  .admin-btn-outline-blue {
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 transition-colors;
+  }
+
+  .admin-btn-outline-gray {
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition-colors;
+  }
+
+  .admin-btn-outline-red {
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 transition-colors;
+  }
+
+  .admin-input {
+    @apply w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 bg-white;
+  }
+
+  .admin-label {
+    @apply block text-sm font-medium text-slate-700 mb-1.5;
+  }
+
+  .admin-badge-active {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700;
+  }
+
+  .admin-badge-inactive {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600;
+  }
+
+  .admin-tab {
+    @apply inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors;
+  }
+
+  .admin-tab-active {
+    @apply text-[#d92128] border-[#d92128];
+  }
+
+  .admin-empty {
+    @apply text-sm text-slate-500 py-8 text-center;
+  }
+}
+
 @tailwind utilities;
 
 body {

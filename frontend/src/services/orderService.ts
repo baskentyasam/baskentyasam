@@ -21,6 +21,8 @@ export interface OrderResponseDto {
   id: number;
   orderNumber: string;
   userId: number;
+  cafeteriaId?: number | null;
+  cafeteriaName?: string | null;
   /** Kasiyer denetimi: sipariş sahibi */
   customerName?: string | null;
   customerEmail?: string | null;
@@ -71,6 +73,7 @@ export const getCashierOrders = async (params?: {
   isPaid?: boolean;
   /** 2+ karakter: ad, e-posta veya öğrenci no ile eşleşen kullanıcıların tüm sipariş geçmişi */
   userSearch?: string;
+  cafeteriaId?: number;
 }): Promise<OrderResponseDto[]> => {
   const res = await apiClient.get<OrderResponseDto[]>("/cashier/orders", {
     params,
@@ -78,20 +81,23 @@ export const getCashierOrders = async (params?: {
   return res.data;
 };
 
-export const getCashierUnpaidRiskOverview =
-  async (): Promise<CashierUnpaidRiskOverview> => {
-    const res = await apiClient.get<CashierUnpaidRiskOverview>(
-      "/cashier/orders/unpaid-risk-overview"
-    );
-    return res.data;
-  };
+export const getCashierUnpaidRiskOverview = async (params?: {
+  cafeteriaId?: number;
+}): Promise<CashierUnpaidRiskOverview> => {
+  const res = await apiClient.get<CashierUnpaidRiskOverview>(
+    "/cashier/orders/unpaid-risk-overview",
+    { params }
+  );
+  return res.data;
+};
 
 export const getCashierUnpaidByUser = async (
-  userId: number
+  userId: number,
+  params?: { cafeteriaId?: number }
 ): Promise<OrderResponseDto[]> => {
   const res = await apiClient.get<OrderResponseDto[]>(
     "/cashier/orders/unpaid-by-user",
-    { params: { userId } }
+    { params: { userId, ...params } }
   );
   return res.data;
 };
@@ -103,11 +109,14 @@ export const cashierSettleDebt = async (id: number) => {
   return res.data;
 };
 
-export const cashierSettleAllUnpaid = async (userId: number) => {
+export const cashierSettleAllUnpaid = async (
+  userId: number,
+  params?: { cafeteriaId?: number }
+) => {
   const res = await apiClient.post<{ settledCount: number; message: string }>(
     "/cashier/orders/settle-all-unpaid",
     null,
-    { params: { userId } }
+    { params: { userId, ...params } }
   );
   return res.data;
 };

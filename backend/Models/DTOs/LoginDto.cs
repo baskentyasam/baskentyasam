@@ -32,6 +32,8 @@ public class LoginDto
                 "teacher" or "instructor" => UserRole.Teacher,
                 "student" => UserRole.Student,
                 "staff" => UserRole.Staff,
+                "superadmin" => UserRole.SuperAdmin,
+                "subadmin" => UserRole.SubAdmin,
                 "admin" => UserRole.Admin,
                 _ => UserRole.Student
             };

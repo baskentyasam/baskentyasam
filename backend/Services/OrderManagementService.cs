@@ -9,10 +9,10 @@ public interface IOrderManagementService
 {
     Task<List<OrderResponseDto>> GetMyOrdersAsync(int userId);
     /// <param name="userSearch">Dolu ve 2+ karakter ise: eşleşen kullanıcı(lar)ın tüm sipariş geçmişi (iptal/ödendi dahil). Boşsa: kasiyer kuyruğu.</param>
-    Task<List<OrderResponseDto>> GetCashierOrdersAsync(OrderStatus? status, bool? isPaid, string? userSearch);
-    Task<CashierUnpaidRiskOverviewDto> GetCashierUnpaidRiskOverviewAsync();
-    /// <summary>Kasiyer borç paneli: kullanıcının tüm NotPaid siparişleri.</summary>
-    Task<List<OrderResponseDto>> GetOpenNotPaidOrdersForUserAsync(int userId);
+    Task<List<OrderResponseDto>> GetCashierOrdersAsync(OrderStatus? status, bool? isPaid, string? userSearch, int? cafeteriaId = null);
+    Task<CashierUnpaidRiskOverviewDto> GetCashierUnpaidRiskOverviewAsync(int? cafeteriaId = null);
+    /// <summary>Kasiyer borç paneli: kullanıcının NotPaid siparişleri (opsiyonel kafe filtresi).</summary>
+    Task<List<OrderResponseDto>> GetOpenNotPaidOrdersForUserAsync(int userId, int? cafeteriaId = null);
     Task<OrderResponseDto?> ApproveAsync(int orderId);
     Task<OrderResponseDto?> PreparingAsync(int orderId);
     Task<OrderResponseDto?> ReadyAsync(int orderId);
@@ -22,7 +22,8 @@ public interface IOrderManagementService
     /// <summary>NotPaid siparişte kasiyer tahsilatı: ödendi kapatır.</summary>
     Task<OrderResponseDto?> SettleNotPaidDebtAsync(int orderId);
     /// <summary>Kullanıcının tüm NotPaid siparişlerini ödendi yapar; kapatılan adet.</summary>
-    Task<int> SettleAllUnpaidDebtsForUserAsync(int userId);
+    Task<int> SettleAllUnpaidDebtsForUserAsync(int userId, int? cafeteriaId = null);
+    Task<bool> CafeteriaExistsAsync(int cafeteriaId);
 }
 
 public class OrderManagementService : IOrderManagementService
@@ -41,6 +42,7 @@ public class OrderManagementService : IOrderManagementService
         var orders = await _context.Orders
             .Where(o => o.UserId == userId)
             .Include(o => o.User)
+            .Include(o => o.Cafeteria)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.MenuItem)
             .OrderByDescending(o => o.CreatedAt)
@@ -49,17 +51,24 @@ public class OrderManagementService : IOrderManagementService
         return orders.Select(MapOrder).ToList();
     }
 
-    public async Task<List<OrderResponseDto>> GetCashierOrdersAsync(OrderStatus? status, bool? isPaid, string? userSearch)
+    public async Task<List<OrderResponseDto>> GetCashierOrdersAsync(
+        OrderStatus? status,
+        bool? isPaid,
+        string? userSearch,
+        int? cafeteriaId = null)
     {
         var term = userSearch?.Trim();
         if (!string.IsNullOrEmpty(term) && term.Length >= 2)
-            return await GetCashierOrdersByUserSearchAsync(term);
+            return await GetCashierOrdersByUserSearchAsync(term, cafeteriaId);
 
         var query = _context.Orders
             .Include(o => o.User)
+            .Include(o => o.Cafeteria)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.MenuItem)
             .AsQueryable();
+
+        query = ApplyCafeteriaFilter(query, cafeteriaId);
 
         if (status.HasValue)
             query = query.Where(o => o.Status == status.Value);
@@ -75,16 +84,19 @@ public class OrderManagementService : IOrderManagementService
             .ToListAsync();
 
         var list = orders.Select(MapOrder).ToList();
-        await EnrichCashierOrdersWithUnpaidStatsAsync(list);
+        await EnrichCashierOrdersWithUnpaidStatsAsync(list, cafeteriaId);
         return list;
     }
 
-    public async Task<CashierUnpaidRiskOverviewDto> GetCashierUnpaidRiskOverviewAsync()
+    public async Task<CashierUnpaidRiskOverviewDto> GetCashierUnpaidRiskOverviewAsync(int? cafeteriaId = null)
     {
         var limit = CafeService.MaxNotPaidOrdersPerUser;
-        var groups = await _context.Orders
+        var unpaidQuery = _context.Orders
             .AsNoTracking()
-            .Where(o => o.Status == OrderStatus.NotPaid)
+            .Where(o => o.Status == OrderStatus.NotPaid);
+        unpaidQuery = ApplyCafeteriaFilter(unpaidQuery, cafeteriaId);
+
+        var groups = await unpaidQuery
             .GroupBy(o => o.UserId)
             .Select(g => new { UserId = g.Key, C = g.Count() })
             .ToListAsync();
@@ -97,25 +109,29 @@ public class OrderManagementService : IOrderManagementService
         };
     }
 
-    public async Task<List<OrderResponseDto>> GetOpenNotPaidOrdersForUserAsync(int userId)
+    public async Task<List<OrderResponseDto>> GetOpenNotPaidOrdersForUserAsync(int userId, int? cafeteriaId = null)
     {
-        var orders = await _context.Orders
+        var query = _context.Orders
             .Where(o => o.UserId == userId && o.Status == OrderStatus.NotPaid)
             .Include(o => o.User)
+            .Include(o => o.Cafeteria)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.MenuItem)
-            .OrderBy(o => o.CreatedAt)
-            .ToListAsync();
+            .AsQueryable();
+
+        query = ApplyCafeteriaFilter(query, cafeteriaId);
+
+        var orders = await query.OrderBy(o => o.CreatedAt).ToListAsync();
 
         var list = orders.Select(MapOrder).ToList();
-        await EnrichCashierOrdersWithUnpaidStatsAsync(list);
+        await EnrichCashierOrdersWithUnpaidStatsAsync(list, cafeteriaId);
         return list;
     }
 
     /// <summary>
     /// Ad, e-posta veya öğrenci numarası ile eşleşen kullanıcıların tüm siparişleri (tamamlanmış, iptal, ödenmedi vb.).
     /// </summary>
-    private async Task<List<OrderResponseDto>> GetCashierOrdersByUserSearchAsync(string term)
+    private async Task<List<OrderResponseDto>> GetCashierOrdersByUserSearchAsync(string term, int? cafeteriaId = null)
     {
         var t = term.ToLowerInvariant();
         var userIds = await _context.Users
@@ -131,27 +147,34 @@ public class OrderManagementService : IOrderManagementService
         if (userIds.Count == 0)
             return new List<OrderResponseDto>();
 
-        var orders = await _context.Orders
+        var orderQuery = _context.Orders
             .Where(o => userIds.Contains(o.UserId))
             .Include(o => o.User)
+            .Include(o => o.Cafeteria)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.MenuItem)
-            .OrderByDescending(o => o.CreatedAt)
-            .ToListAsync();
+            .AsQueryable();
+
+        orderQuery = ApplyCafeteriaFilter(orderQuery, cafeteriaId);
+
+        var orders = await orderQuery.OrderByDescending(o => o.CreatedAt).ToListAsync();
 
         var list = orders.Select(MapOrder).ToList();
-        await EnrichCashierOrdersWithUnpaidStatsAsync(list);
+        await EnrichCashierOrdersWithUnpaidStatsAsync(list, cafeteriaId);
         return list;
     }
 
-    private async Task EnrichCashierOrdersWithUnpaidStatsAsync(List<OrderResponseDto> list)
+    private async Task EnrichCashierOrdersWithUnpaidStatsAsync(List<OrderResponseDto> list, int? cafeteriaId = null)
     {
         if (list.Count == 0) return;
 
         var userIds = list.Select(o => o.UserId).Distinct().ToList();
-        var rows = await _context.Orders
+        var unpaidQuery = _context.Orders
             .AsNoTracking()
-            .Where(o => o.Status == OrderStatus.NotPaid && userIds.Contains(o.UserId))
+            .Where(o => o.Status == OrderStatus.NotPaid && userIds.Contains(o.UserId));
+        unpaidQuery = ApplyCafeteriaFilter(unpaidQuery, cafeteriaId);
+
+        var rows = await unpaidQuery
             .GroupBy(o => o.UserId)
             .Select(g => new { UserId = g.Key, Count = g.Count(), Total = g.Sum(x => x.TotalAmount) })
             .ToListAsync();
@@ -172,11 +195,14 @@ public class OrderManagementService : IOrderManagementService
         }
     }
 
-    private async Task EnrichSingleDtoUnpaidStatsAsync(OrderResponseDto dto)
+    private async Task EnrichSingleDtoUnpaidStatsAsync(OrderResponseDto dto, int? cafeteriaId = null)
     {
-        var agg = await _context.Orders
+        var unpaidQuery = _context.Orders
             .AsNoTracking()
-            .Where(o => o.UserId == dto.UserId && o.Status == OrderStatus.NotPaid)
+            .Where(o => o.UserId == dto.UserId && o.Status == OrderStatus.NotPaid);
+        unpaidQuery = ApplyCafeteriaFilter(unpaidQuery, cafeteriaId);
+
+        var agg = await unpaidQuery
             .GroupBy(o => o.UserId)
             .Select(g => new { Count = g.Count(), Total = g.Sum(x => x.TotalAmount) })
             .FirstOrDefaultAsync();
@@ -351,16 +377,20 @@ public class OrderManagementService : IOrderManagementService
             $"#{order.OrderNumber} numaralı ödenmemiş kaydınız tahsil edildi.");
 
         var dto = MapOrder(order);
-        await EnrichSingleDtoUnpaidStatsAsync(dto);
+        await EnrichSingleDtoUnpaidStatsAsync(dto, order.CafeteriaId);
         return dto;
     }
 
-    public async Task<int> SettleAllUnpaidDebtsForUserAsync(int userId)
+    public async Task<int> SettleAllUnpaidDebtsForUserAsync(int userId, int? cafeteriaId = null)
     {
-        var debts = await _context.Orders
+        var debtQuery = _context.Orders
             .Where(o => o.UserId == userId && o.Status == OrderStatus.NotPaid)
             .Include(o => o.User)
-            .ToListAsync();
+            .AsQueryable();
+
+        debtQuery = ApplyCafeteriaFilter(debtQuery, cafeteriaId);
+
+        var debts = await debtQuery.ToListAsync();
 
         if (debts.Count == 0) return 0;
 
@@ -395,9 +425,22 @@ public class OrderManagementService : IOrderManagementService
     {
         return await _context.Orders
             .Include(o => o.User)
+            .Include(o => o.Cafeteria)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.MenuItem)
             .FirstOrDefaultAsync(o => o.Id == orderId);
+    }
+
+    private static IQueryable<Order> ApplyCafeteriaFilter(IQueryable<Order> query, int? cafeteriaId)
+    {
+        if (cafeteriaId.HasValue)
+            query = query.Where(o => o.CafeteriaId == cafeteriaId.Value);
+        return query;
+    }
+
+    public async Task<bool> CafeteriaExistsAsync(int cafeteriaId)
+    {
+        return await _context.Cafeterias.AnyAsync(c => c.Id == cafeteriaId);
     }
 
     private static void EnsureNotCancelled(Order order)
@@ -429,6 +472,8 @@ public class OrderManagementService : IOrderManagementService
             Id = order.Id,
             OrderNumber = order.OrderNumber,
             UserId = order.UserId,
+            CafeteriaId = order.CafeteriaId,
+            CafeteriaName = order.Cafeteria?.Name,
             CustomerName = order.User?.Name,
             CustomerEmail = order.User?.Email,
             StudentNo = order.User?.StudentNo,

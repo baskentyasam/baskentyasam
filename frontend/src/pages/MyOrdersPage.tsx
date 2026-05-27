@@ -67,6 +67,11 @@ const MyOrdersPage: React.FC = () => {
                   <div>
                     <p className="text-sm text-slate-500">Sipariş No</p>
                     <p className="text-lg font-semibold text-slate-900">{o.orderNumber}</p>
+                    {o.cafeteriaName && (
+                      <p className="text-sm text-slate-600 mt-1">
+                        Kafeterya: <span className="font-medium">{o.cafeteriaName}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-800">
@@ -87,7 +92,7 @@ const MyOrdersPage: React.FC = () => {
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-slate-700 mb-2">Ürünler</p>
                     <div className="space-y-2">
-                      {o.orderItems.map((it) => (
+                      {(o.orderItems ?? []).map((it) => (
                         <div key={it.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                           <div className="text-sm text-slate-900">
                             {it.menuItemName} <span className="text-slate-500">x {it.quantity}</span>
@@ -103,7 +108,9 @@ const MyOrdersPage: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-slate-700 mb-2">Toplam</p>
                     <div className="bg-slate-50 rounded-lg p-4">
-                      <p className="text-2xl font-bold text-[#d71920]">{o.totalAmount.toFixed(2)} ₺</p>
+                      <p className="text-2xl font-bold text-[#d71920]">
+                        {(o.totalAmount ?? 0).toFixed(2)} ₺
+                      </p>
                       <p className="text-xs text-slate-500 mt-1">
                         Oluşturma: {new Date(o.createdAt).toLocaleString("tr-TR")}
                       </p>

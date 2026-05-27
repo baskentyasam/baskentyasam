@@ -16,6 +16,8 @@ public class OrderResponseDto
     public int Id { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
     public int UserId { get; set; }
+    public int? CafeteriaId { get; set; }
+    public string? CafeteriaName { get; set; }
     /// <summary>Kasiyer denetimi: sipariş sahibinin görünen adı (User.Name).</summary>
     public string? CustomerName { get; set; }
     /// <summary>Kasiyer denetimi: e-posta.</summary>

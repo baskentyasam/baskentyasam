@@ -3,6 +3,8 @@ namespace ApiProject.Models.DTOs;
 public class CafeteriaOrderResponseDto
 {
     public int Id { get; set; }
+    public int? CafeteriaId { get; set; }
+    public string? CafeteriaName { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
     /// <summary>Detay tabloları için ISO tarih (UTC).</summary>
     public DateTime CreatedAtUtc { get; set; }

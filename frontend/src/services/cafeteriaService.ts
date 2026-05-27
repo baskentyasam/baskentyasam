@@ -1,5 +1,12 @@
 import apiClient from '../api/axios';
 
+export interface ActiveCafeteria {
+  id: number;
+  name: string;
+  location?: string | null;
+  description?: string | null;
+}
+
 export interface MenuItemFromApi {
   id: number;
   name: string;
@@ -10,6 +17,7 @@ export interface MenuItemFromApi {
 }
 
 export interface CreateOrderRequest {
+  cafeteriaId: number;
   orderItems: { menuItemId: number; quantity: number }[];
   pickupTime: string;
   note?: string;
@@ -24,6 +32,8 @@ export interface OrderItemResponse {
 
 export interface OrderResponse {
   id: number;
+  cafeteriaId?: number;
+  cafeteriaName?: string;
   items: OrderItemResponse[];
   totalPrice: number;
   pickupTime: string;
@@ -52,6 +62,17 @@ export interface MyUnpaidOrdersSummary {
   orders: UnpaidOrderLine[];
 }
 
+export const getActiveCafeterias = async (): Promise<ActiveCafeteria[]> => {
+  const response = await apiClient.get<ActiveCafeteria[]>('/cafeterias/active');
+  return response.data;
+};
+
+export const getMenuByCafeteria = async (cafeteriaId: number): Promise<MenuItemFromApi[]> => {
+  const response = await apiClient.get<MenuItemFromApi[]>(`/cafeterias/${cafeteriaId}/menu`);
+  return response.data;
+};
+
+/** @deprecated Aşama 6+: getMenuByCafeteria kullanın */
 export const getMenuItems = async (): Promise<MenuItemFromApi[]> => {
   const response = await apiClient.get<MenuItemFromApi[]>('/Menu');
   return response.data;

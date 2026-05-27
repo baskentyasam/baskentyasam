@@ -22,6 +22,57 @@ namespace ApiProject.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ApiProject.Models.AdminAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("ModuleType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("module_type");
+
+                    b.Property<string>("ScopeDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("scope_display_name");
+
+                    b.Property<string>("ScopeKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("scope_key");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("admin_assignments", (string)null);
+                });
+
             modelBuilder.Entity("ApiProject.Models.Appointment", b =>
                 {
                     b.Property<int>("Id")
@@ -69,6 +120,119 @@ namespace ApiProject.Migrations
                     b.ToTable("appointments", (string)null);
                 });
 
+            modelBuilder.Entity("ApiProject.Models.Cafeteria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("cafeterias", (string)null);
+                });
+
+            modelBuilder.Entity("ApiProject.Models.Department", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("FacultyId")
+                        .HasColumnType("integer")
+                        .HasColumnName("faculty_id");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacultyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("departments", (string)null);
+                });
+
+            modelBuilder.Entity("ApiProject.Models.Faculty", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("faculties", (string)null);
+                });
+
             modelBuilder.Entity("ApiProject.Models.InstructorSchedule", b =>
                 {
                     b.Property<int>("Id")
@@ -110,6 +274,9 @@ namespace ApiProject.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CafeteriaId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -130,6 +297,8 @@ namespace ApiProject.Migrations
                         .HasColumnType("decimal(10,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CafeteriaId");
 
                     b.ToTable("cafeteria_menu_items", (string)null);
                 });
@@ -189,6 +358,9 @@ namespace ApiProject.Migrations
                     b.Property<DateTime?>("ApprovedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<int?>("CafeteriaId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
@@ -230,6 +402,8 @@ namespace ApiProject.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CafeteriaId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("Orders", (string)null);
@@ -262,6 +436,52 @@ namespace ApiProject.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("OrderItems", (string)null);
+                });
+
+            modelBuilder.Entity("ApiProject.Models.ParkingLot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CurrentOccupancy")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_occupancy");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("parking_lots", (string)null);
                 });
 
             modelBuilder.Entity("ApiProject.Models.PasswordResetToken", b =>
@@ -314,11 +534,27 @@ namespace ApiProject.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("department_id");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("email");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsVisibleForAppointment")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_visible_for_appointment");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -344,7 +580,28 @@ namespace ApiProject.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DepartmentId");
+
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("ApiProject.Models.AdminAssignment", b =>
+                {
+                    b.HasOne("ApiProject.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ApiProject.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ApiProject.Models.Appointment", b =>
@@ -366,6 +623,17 @@ namespace ApiProject.Migrations
                     b.Navigation("Teacher");
                 });
 
+            modelBuilder.Entity("ApiProject.Models.Department", b =>
+                {
+                    b.HasOne("ApiProject.Models.Faculty", "Faculty")
+                        .WithMany("Departments")
+                        .HasForeignKey("FacultyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Faculty");
+                });
+
             modelBuilder.Entity("ApiProject.Models.InstructorSchedule", b =>
                 {
                     b.HasOne("ApiProject.Models.User", "Instructor")
@@ -377,13 +645,30 @@ namespace ApiProject.Migrations
                     b.Navigation("Instructor");
                 });
 
+            modelBuilder.Entity("ApiProject.Models.MenuItem", b =>
+                {
+                    b.HasOne("ApiProject.Models.Cafeteria", "Cafeteria")
+                        .WithMany("MenuItems")
+                        .HasForeignKey("CafeteriaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Cafeteria");
+                });
+
             modelBuilder.Entity("ApiProject.Models.Order", b =>
                 {
+                    b.HasOne("ApiProject.Models.Cafeteria", "Cafeteria")
+                        .WithMany("Orders")
+                        .HasForeignKey("CafeteriaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ApiProject.Models.User", "User")
                         .WithMany("Orders")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Cafeteria");
 
                     b.Navigation("User");
                 });
@@ -416,6 +701,33 @@ namespace ApiProject.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ApiProject.Models.User", b =>
+                {
+                    b.HasOne("ApiProject.Models.Department", "Department")
+                        .WithMany("Users")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("ApiProject.Models.Cafeteria", b =>
+                {
+                    b.Navigation("MenuItems");
+
+                    b.Navigation("Orders");
+                });
+
+            modelBuilder.Entity("ApiProject.Models.Department", b =>
+                {
+                    b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("ApiProject.Models.Faculty", b =>
+                {
+                    b.Navigation("Departments");
                 });
 
             modelBuilder.Entity("ApiProject.Models.MenuItem", b =>

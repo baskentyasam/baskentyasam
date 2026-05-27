@@ -7,7 +7,7 @@ const LoginPage: React.FC = () => {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"student" | "instructor" | "cashier">("student");
+  const [role, setRole] = useState<"student" | "instructor" | "cashier" | "superadmin" | "subadmin">("student");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [showError, setShowError] = useState(false);
@@ -67,6 +67,10 @@ const LoginPage: React.FC = () => {
         navigate("/ogretim-elemani", { replace: true });
       } else if (userRole === "cashier") {
         navigate("/kasiyer/siparisler", { replace: true });
+      } else if (userRole === "superadmin") {
+        navigate("/admin", { replace: true });
+      } else if (userRole === "subadmin") {
+        navigate("/admin/panel", { replace: true });
       } else {
         // Eğer role belirlenemezse, seçilen role göre yönlendir
         console.log('Role not determined, using selected role:', role); // Debug için
@@ -74,6 +78,10 @@ const LoginPage: React.FC = () => {
           navigate("/ogrenci", { replace: true });
         } else if (role === "instructor") {
           navigate("/ogretim-elemani", { replace: true });
+        } else if (role === "superadmin") {
+          navigate("/admin", { replace: true });
+        } else if (role === "subadmin") {
+          navigate("/admin/panel", { replace: true });
         } else {
           navigate("/kasiyer/siparisler", { replace: true });
         }
@@ -104,7 +112,7 @@ const LoginPage: React.FC = () => {
         name,
         email,
         password,
-        role: role === "cashier" ? "student" : role,
+        role: role === "cashier" || role === "superadmin" || role === "subadmin" ? "student" : role,
         studentNo: role === "student" ? undefined : undefined,
       });
 
@@ -134,6 +142,10 @@ const LoginPage: React.FC = () => {
         navigate("/ogretim-elemani", { replace: true });
       } else if (userRole === "cashier") {
         navigate("/kasiyer/siparisler", { replace: true });
+      } else if (userRole === "superadmin") {
+        navigate("/admin", { replace: true });
+      } else if (userRole === "subadmin") {
+        navigate("/admin/panel", { replace: true });
       } else {
         // Eğer role belirlenemezse, seçilen role göre yönlendir
         console.log('Role not determined, using selected role (register):', role); // Debug için
@@ -141,6 +153,10 @@ const LoginPage: React.FC = () => {
           navigate("/ogrenci", { replace: true });
         } else if (role === "instructor") {
           navigate("/ogretim-elemani", { replace: true });
+        } else if (role === "superadmin") {
+          navigate("/admin", { replace: true });
+        } else if (role === "subadmin") {
+          navigate("/admin/panel", { replace: true });
         } else {
           navigate("/kasiyer/siparisler", { replace: true });
         }
@@ -259,12 +275,14 @@ const LoginPage: React.FC = () => {
 
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as "student" | "instructor" | "cashier")}
+          onChange={(e) => setRole(e.target.value as "student" | "instructor" | "cashier" | "superadmin" | "subadmin")}
           className="border rounded-lg px-4 py-2"
         >
           <option value="student">Öğrenci</option>
           <option value="instructor">Akademik Personel</option>
           {!isSignup && <option value="cashier">Kasiyer</option>}
+          {!isSignup && <option value="superadmin">Sistem Yöneticisi</option>}
+          {!isSignup && <option value="subadmin">Alt Admin</option>}
         </select>
         {!isSignup && (
           <div className="text-right mt-2">

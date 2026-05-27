@@ -193,11 +193,33 @@ DROP TABLE IF EXISTS "instructor_schedule" CASCADE;
 
 Backend başladığında otomatik olarak şu kullanıcılar oluşturulur:
 
-| Email | Şifre | Rol |
-|-------|-------|-----|
-| ali.ogrenci@baskent.edu.tr | baskent123 | Öğrenci |
-| hoca@baskent.edu.tr | baskent123 | Akademik Personel |
-| admin@baskent.edu.tr | admin123 | Admin |
+| Email | Şifre | Rol | Not |
+|-------|-------|-----|-----|
+| ali.ogrenci@baskent.edu.tr | baskent123 | Öğrenci | |
+| hoca@baskent.edu.tr | baskent123 | Akademik Personel | |
+| kasiyer@baskent.edu.tr | 123456 | Kasiyer (Staff) | Kullanıcı adı: `kasiyer` |
+| systemadmin@baskentyasam.com | 123456 | Sistem Yöneticisi (SuperAdmin) | `/admin` paneli |
+
+### Legacy Admin (devre dışı)
+
+| Email | Durum |
+|-------|--------|
+| admin@baskent.edu.tr | **Pasif / legacy** — yeni sistemde giriş yapılamaz. Aktif yönetim **SuperAdmin** ve **SubAdmin** rolleri ile yapılır. |
+
+### role_id eşlemesi
+
+`users.role_id` = `(int)UserRole + 1`
+
+| role_id | UserRole | Açıklama |
+|---------|----------|----------|
+| 1 | Student | Öğrenci |
+| 2 | Teacher | Akademik personel |
+| 3 | Staff | Kasiyer |
+| 4 | Admin | Legacy (pasif) |
+| 5 | SuperAdmin | Sistem Yöneticisi |
+| 6 | SubAdmin | Alt Admin |
+
+> **Not:** EF Core migration'ları `roles` lookup tablosu oluşturmaz; `role_id` doğrudan integer saklanır. Eski veritabanlarında `roles` tablosu + FK varsa `DbInitializer` eksik 5/6 kayıtlarını idempotent ekler. Kontrol için: `backend/scripts/checks/check_roles_table.sql`
 
 ---
 

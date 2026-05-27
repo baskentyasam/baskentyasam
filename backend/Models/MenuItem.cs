@@ -21,10 +21,15 @@ public class MenuItem
     
     [MaxLength(500)]
     public string? ImageUrl { get; set; }
+
+    public int? CafeteriaId { get; set; }
     
     public bool IsAvailable { get; set; } = true;
     
     // Navigation Properties
+    [ForeignKey(nameof(CafeteriaId))]
+    public virtual Cafeteria? Cafeteria { get; set; }
+
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 }
 

@@ -17,6 +17,11 @@ namespace ApiProject.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<InstructorSchedule> InstructorSchedules { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<AdminAssignment> AdminAssignments { get; set; }
+        public DbSet<Cafeteria> Cafeterias { get; set; }
+        public DbSet<ParkingLot> ParkingLots { get; set; }
+        public DbSet<Faculty> Faculties { get; set; }
+        public DbSet<Department> Departments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -31,6 +36,11 @@ namespace ApiProject.Data
             modelBuilder.Entity<Notification>().ToTable("Notifications");
             modelBuilder.Entity<InstructorSchedule>().ToTable("instructor_schedule");
             modelBuilder.Entity<PasswordResetToken>().ToTable("password_reset_tokens");
+            modelBuilder.Entity<AdminAssignment>().ToTable("admin_assignments");
+            modelBuilder.Entity<Cafeteria>().ToTable("cafeterias");
+            modelBuilder.Entity<ParkingLot>().ToTable("parking_lots");
+            modelBuilder.Entity<Faculty>().ToTable("faculties");
+            modelBuilder.Entity<Department>().ToTable("departments");
 
             modelBuilder.Entity<PasswordResetToken>(entity =>
             {
@@ -51,9 +61,9 @@ namespace ApiProject.Data
             modelBuilder.Entity<User>(entity =>
             {
                 entity.Property(e => e.Id).HasColumnName("id");
-                // role_id kolonu integer - enum'ı integer'a çevir
-                // roles tablosundaki ID'ler (1, 2, 3, 4) olabilir, enum değerlerimiz (0, 1, 2, 3)
-                // Bu yüzden enum değerini +1 yaparak kaydediyoruz (Student=0 -> role_id=1, Teacher=1 -> role_id=2)
+                // role_id kolonu integer - enum ile eşleme: DB'de (int)enum + 1
+                // Student=0→1, Teacher=1→2, Staff=2→3, Admin=3→4, SuperAdmin=4→5, SubAdmin=5→6
+                // Bazı eski DB'lerde roles lookup tablosu + FK olabilir; DbInitializer idempotent 5/6 ekler.
                 entity.Property(e => e.Role)
                     .HasColumnName("role_id")
                     .HasConversion(
@@ -63,9 +73,90 @@ namespace ApiProject.Data
                 entity.Property(e => e.Email).HasColumnName("email");
                 entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
                 entity.Property(e => e.StudentNo).HasColumnName("staff_id");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.DepartmentId).HasColumnName("department_id");
+                entity.Property(e => e.IsVisibleForAppointment)
+                    .HasColumnName("is_visible_for_appointment")
+                    .HasDefaultValue(true);
                 // login_type kolonu PostgreSQL ENUM tipi olduğu için Entity Framework ile uyumsuz
                 // Bu alanı ignore edip, ham SQL ile güncelleyeceğiz
                 entity.Ignore(e => e.LoginType);
+
+                entity.HasOne(e => e.Department)
+                    .WithMany(d => d.Users)
+                    .HasForeignKey(e => e.DepartmentId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<Faculty>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => e.Name).IsUnique();
+            });
+
+            modelBuilder.Entity<Department>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.FacultyId).HasColumnName("faculty_id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => new { e.FacultyId, e.Name }).IsUnique();
+
+                entity.HasOne(e => e.Faculty)
+                    .WithMany(f => f.Departments)
+                    .HasForeignKey(e => e.FacultyId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<AdminAssignment>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.UserId).HasColumnName("user_id");
+                entity.Property(e => e.ModuleType).HasColumnName("module_type").HasConversion<string>();
+                entity.Property(e => e.ScopeKey).HasColumnName("scope_key");
+                entity.Property(e => e.ScopeDisplayName).HasColumnName("scope_display_name");
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
+
+                entity.HasIndex(e => new { e.UserId, e.IsActive });
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Cafeteria>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.Location).HasColumnName("location");
+                entity.Property(e => e.Description).HasColumnName("description");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => e.Name).IsUnique();
+            });
+
+            modelBuilder.Entity<ParkingLot>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.Location).HasColumnName("location");
+                entity.Property(e => e.Capacity).HasColumnName("capacity");
+                entity.Property(e => e.CurrentOccupancy).HasColumnName("current_occupancy");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => e.Name).IsUnique();
             });
 
             // Appointment entity column mappings - snake_case kolon adları
@@ -105,6 +196,18 @@ namespace ApiProject.Data
             // Enum Ayarları
             modelBuilder.Entity<Order>().Property(o => o.Status).HasConversion<string>();
             modelBuilder.Entity<Notification>().Property(n => n.Type).HasConversion<string>();
+
+            modelBuilder.Entity<MenuItem>()
+                .HasOne(m => m.Cafeteria)
+                .WithMany(c => c.MenuItems)
+                .HasForeignKey(m => m.CafeteriaId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Order>()
+                .HasOne(o => o.Cafeteria)
+                .WithMany(c => c.Orders)
+                .HasForeignKey(o => o.CafeteriaId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // İlişki Ayarları - Shadow property uyarısını önlemek için navigation property'leri belirt
             modelBuilder.Entity<Appointment>()

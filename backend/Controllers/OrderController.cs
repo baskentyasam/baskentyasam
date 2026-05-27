@@ -50,14 +50,19 @@ public class OrderController : ControllerBase
         if (userId == null)
             return Unauthorized();
 
-        var orders = await _cafeService.GetUserOrdersAsync(userId.Value);
+        var orders = await _orderManagementService.GetMyOrdersAsync(userId.Value);
         return Ok(orders);
     }
 
     [HttpGet("my-orders")]
     public async Task<ActionResult> GetMyOrdersLegacy()
     {
-        return await GetMyOrders();
+        var userId = GetCurrentUserId();
+        if (userId == null)
+            return Unauthorized();
+
+        var orders = await _cafeService.GetUserOrdersAsync(userId.Value);
+        return Ok(orders);
     }
 
     /// <summary>

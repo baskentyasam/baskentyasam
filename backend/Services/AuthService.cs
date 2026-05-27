@@ -61,6 +61,16 @@ public class AuthService : IAuthService
         if (user == null)
             return null;
 
+        if (!user.IsActive)
+        {
+            throw new UnauthorizedAccessException("Hesabınız pasif durumda. Lütfen sistem yöneticisi ile iletişime geçin.");
+        }
+
+        if (user.Role == UserRole.Admin)
+        {
+            throw new UnauthorizedAccessException("Legacy yönetici hesabı devre dışıdır. Lütfen Sistem Yöneticisi hesabı kullanın.");
+        }
+
         // BCrypt ile şifre kontrolü
         if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash))
             return null;
@@ -69,9 +79,11 @@ public class AuthService : IAuthService
         // login_type veritabanında PostgreSQL ENUM (NULL, 'school_email', 'staff_id')
         // Ham SQL ile kontrol yapıyoruz
         //
-        // ÖZEL DURUM: Kasiyer hesabı (tek hesap) için email doğrulaması zorunlu değil.
-        // Bu yüzden Name = "kasiyer" ve Role = Staff ise bu kontrolü atlıyoruz.
-        if (!(user.Name.ToLower().Trim() == "kasiyer" && user.Role == UserRole.Staff))
+        // ÖZEL DURUM: Kasiyer + SuperAdmin + SubAdmin hesapları için doğrulama zorunlu değil.
+        var skipVerification = (user.Name.ToLower().Trim() == "kasiyer" && user.Role == UserRole.Staff)
+            || user.Role == UserRole.SuperAdmin
+            || user.Role == UserRole.SubAdmin;
+        if (!skipVerification)
         {
             try
             {
@@ -141,6 +153,11 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
     {
+        if (registerDto.Role is not UserRole.Student and not UserRole.Teacher)
+        {
+            throw new InvalidOperationException("Bu kayıt tipi desteklenmiyor.");
+        }
+
         // Kullanıcı adı kontrolü (Name ile kontrol)
         var existingUser = await _context.Users
             .FirstOrDefaultAsync(u => u.Name.ToLower().Trim() == registerDto.Username.ToLower().Trim());

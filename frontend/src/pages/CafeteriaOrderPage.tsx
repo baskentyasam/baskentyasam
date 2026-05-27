@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCurrentUser } from "../services/authService";
 import {
-  getMenuItems,
+  getActiveCafeterias,
+  getMenuByCafeteria,
   createOrder,
   getMyOrders,
   getMyUnpaidOrders,
   getPickupTimeDensity,
+  ActiveCafeteria,
   MenuItemFromApi,
   MyUnpaidOrdersSummary,
   OrderResponse,
@@ -39,6 +41,7 @@ interface OrderItem {
 
 interface PastOrder {
   id: number;
+  cafeteriaName?: string;
   items: OrderItem[];
   totalPrice: number;
   selectedTime: string;
@@ -107,26 +110,46 @@ const statusStyles: Record<string, string> = {
 };
 
 const CART_STORAGE_KEY = "cafeteria_cart";
+const SELECTED_CAFE_STORAGE_KEY = "cafeteria_selected_id";
 
 interface CartItem {
   itemId: number;
   quantity: number;
 }
 
-function loadCartFromStorage(): CartItem[] {
-  try {
-    const data = localStorage.getItem(CART_STORAGE_KEY);
-    if (data) return JSON.parse(data);
-  } catch { /* ignore */ }
-  return [];
+interface StoredCart {
+  cafeteriaId: number;
+  items: CartItem[];
 }
 
-function saveCartToStorage(items: { item: MenuItem; quantity: number }[]) {
-  const data: CartItem[] = items.map((si) => ({
-    itemId: si.item.id,
-    quantity: si.quantity,
-  }));
+function loadCartFromStorage(cafeteriaId: number): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw) as StoredCart;
+    if (data.cafeteriaId !== cafeteriaId) return [];
+    return data.items || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCartToStorage(
+  cafeteriaId: number,
+  items: { item: MenuItem; quantity: number }[],
+) {
+  const data: StoredCart = {
+    cafeteriaId,
+    items: items.map((si) => ({
+      itemId: si.item.id,
+      quantity: si.quantity,
+    })),
+  };
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data));
+}
+
+function clearCartStorage() {
+  localStorage.removeItem(CART_STORAGE_KEY);
 }
 
 function mapApiToMenuItem(apiItem: MenuItemFromApi): MenuItem {
@@ -145,6 +168,7 @@ function mapApiToMenuItem(apiItem: MenuItemFromApi): MenuItem {
 function mapOrderResponse(order: OrderResponse): PastOrder {
   return {
     id: order.id,
+    cafeteriaName: order.cafeteriaName,
     items: order.items.map((item) => ({
       menuItemId: item.menuItemId,
       name: item.name,
@@ -163,8 +187,15 @@ const CafeteriaOrderPage: React.FC = () => {
   const user = getCurrentUser();
   const isStudent = user?.role === "student";
 
+  const [activeCafeterias, setActiveCafeterias] = useState<ActiveCafeteria[]>([]);
+  const [cafeteriaListLoading, setCafeteriaListLoading] = useState(true);
+  const [cafeteriaListError, setCafeteriaListError] = useState("");
+  const [selectedCafeteria, setSelectedCafeteria] = useState<ActiveCafeteria | null>(
+    null,
+  );
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [menuError, setMenuError] = useState("");
   const [selectedCategory, setSelectedCategory] =
     useState<string>("Sandviçler");
   const [searchTerm, setSearchTerm] = useState("");
@@ -192,33 +223,68 @@ const CafeteriaOrderPage: React.FC = () => {
   const isUnpaidLimitReached = unpaidCount >= unpaidLimit;
 
   useEffect(() => {
-    const fetchMenu = async () => {
+    const loadCafeterias = async () => {
+      setCafeteriaListLoading(true);
+      setCafeteriaListError("");
       try {
-        const data = await getMenuItems();
-        setMenuItems(data.map(mapApiToMenuItem));
-      } catch (err) {
-        console.error("Menü yüklenemedi:", err);
+        const list = await getActiveCafeterias();
+        setActiveCafeterias(list);
+        const savedId = sessionStorage.getItem(SELECTED_CAFE_STORAGE_KEY);
+        if (savedId) {
+          const cafe = list.find((c) => c.id === Number(savedId));
+          if (cafe) setSelectedCafeteria(cafe);
+        }
+      } catch {
+        setCafeteriaListError("Kafeteryalar yüklenemedi.");
       } finally {
-        setMenuLoading(false);
+        setCafeteriaListLoading(false);
       }
     };
-    fetchMenu();
+    void loadCafeterias();
   }, []);
 
   useEffect(() => {
-    if (menuItems.length === 0) return;
-    const stored = loadCartFromStorage();
-    if (stored.length > 0) {
-      const restored = stored
-        .map((ci) => {
-          const item = menuItems.find((m) => m.id === ci.itemId);
-          return item ? { item, quantity: ci.quantity } : null;
-        })
-        .filter(Boolean) as { item: MenuItem; quantity: number }[];
-      if (restored.length > 0) setSelectedItems(restored);
+    if (!selectedCafeteria) {
+      setMenuItems([]);
+      setMenuLoading(false);
+      setMenuError("");
+      setCartLoaded(true);
+      return;
     }
-    setCartLoaded(true);
-  }, [menuItems]);
+
+    const loadMenu = async () => {
+      setMenuLoading(true);
+      setMenuError("");
+      setCartLoaded(false);
+      try {
+        const data = await getMenuByCafeteria(selectedCafeteria.id);
+        const mapped = data.map(mapApiToMenuItem);
+        setMenuItems(mapped);
+
+        const stored = loadCartFromStorage(selectedCafeteria.id);
+        if (stored.length > 0) {
+          const restored = stored
+            .map((ci) => {
+              const item = mapped.find((m) => m.id === ci.itemId);
+              return item ? { item, quantity: ci.quantity } : null;
+            })
+            .filter(Boolean) as { item: MenuItem; quantity: number }[];
+          setSelectedItems(restored);
+        } else {
+          setSelectedItems([]);
+        }
+      } catch {
+        setMenuError("Menü yüklenemedi.");
+        setMenuItems([]);
+        setSelectedItems([]);
+      } finally {
+        setMenuLoading(false);
+        setCartLoaded(true);
+      }
+    };
+
+    void loadMenu();
+  }, [selectedCafeteria]);
 
   const refreshOrdersAndUnpaid = useCallback(async () => {
     try {
@@ -245,9 +311,13 @@ const CafeteriaOrderPage: React.FC = () => {
   }, [refreshOrdersAndUnpaid]);
 
   useEffect(() => {
-    if (!cartLoaded) return;
-    saveCartToStorage(selectedItems);
-  }, [selectedItems, cartLoaded]);
+    if (!cartLoaded || !selectedCafeteria) return;
+    if (selectedItems.length === 0) {
+      clearCartStorage();
+      return;
+    }
+    saveCartToStorage(selectedCafeteria.id, selectedItems);
+  }, [selectedItems, cartLoaded, selectedCafeteria]);
 
   const filteredItems = useMemo(() => {
     const trimmedSearch = searchTerm.trim().toLowerCase();
@@ -271,6 +341,36 @@ const CafeteriaOrderPage: React.FC = () => {
   const pastOrders = orders.filter(
     (order) => pastStatuses.includes(order.status),
   );
+
+  const applyCafeteriaChange = (cafe: ActiveCafeteria | null, clearCart: boolean) => {
+    if (clearCart) {
+      setSelectedItems([]);
+      clearCartStorage();
+    }
+    if (cafe) {
+      sessionStorage.setItem(SELECTED_CAFE_STORAGE_KEY, String(cafe.id));
+      setSelectedCafeteria(cafe);
+    } else {
+      sessionStorage.removeItem(SELECTED_CAFE_STORAGE_KEY);
+      setSelectedCafeteria(null);
+      setMenuItems([]);
+    }
+  };
+
+  const requestCafeteriaChange = (cafe: ActiveCafeteria | null) => {
+    if (cafe?.id === selectedCafeteria?.id) return;
+
+    if (selectedItems.length > 0) {
+      const ok = window.confirm(
+        "Kafeterya değiştirirsen mevcut sepetin temizlenecek. Devam etmek istiyor musun?",
+      );
+      if (!ok) return;
+      applyCafeteriaChange(cafe, true);
+      return;
+    }
+
+    applyCafeteriaChange(cafe, false);
+  };
 
   const handleAddToCart = (item: MenuItem) => {
     const existingItem = selectedItems.find((si) => si.item.id === item.id);
@@ -315,6 +415,11 @@ const CafeteriaOrderPage: React.FC = () => {
       return;
     }
 
+    if (!selectedCafeteria) {
+      alert("Lütfen bir kafeterya seçiniz.");
+      return;
+    }
+
     if (selectedItems.length === 0) {
       alert("Lütfen en az bir ürün seçiniz.");
       return;
@@ -328,6 +433,7 @@ const CafeteriaOrderPage: React.FC = () => {
     setSubmitting(true);
     try {
       await createOrder({
+        cafeteriaId: selectedCafeteria.id,
         orderItems: selectedItems.map((si) => ({
           menuItemId: si.item.id,
           quantity: si.quantity,
@@ -340,11 +446,13 @@ const CafeteriaOrderPage: React.FC = () => {
       setSelectedItems([]);
       setSelectedTime("");
       setNote("");
-      localStorage.removeItem(CART_STORAGE_KEY);
+      clearCartStorage();
       await refreshOrdersAndUnpaid();
     } catch (err: any) {
       const msg =
-        err.response?.data?.message || "Sipariş oluşturulurken bir hata oluştu.";
+        err.response?.data?.message ||
+        err.response?.data?.title ||
+        "Sipariş oluşturulamadı.";
       alert(msg);
     } finally {
       setSubmitting(false);
@@ -506,7 +614,78 @@ const CafeteriaOrderPage: React.FC = () => {
       )}
 
       <main className="flex-1 px-4 py-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div className="max-w-7xl mx-auto">
+          {!selectedCafeteria ? (
+            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6 md:p-8">
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">
+                Kafeterya Seçin
+              </h2>
+              <p className="text-sm text-slate-600 mb-6">
+                Sipariş vermek istediğiniz kafeteryayı seçin.
+              </p>
+              {cafeteriaListLoading ? (
+                <p className="text-slate-500">Kafeteryalar yükleniyor...</p>
+              ) : cafeteriaListError ? (
+                <p className="text-red-600">{cafeteriaListError}</p>
+              ) : activeCafeterias.length === 0 ? (
+                <p className="text-slate-500">Aktif kafeterya bulunamadı.</p>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeCafeterias.map((cafe) => (
+                    <button
+                      key={cafe.id}
+                      type="button"
+                      onClick={() => requestCafeteriaChange(cafe)}
+                      className="text-left rounded-2xl border border-slate-200 p-5 hover:border-[#d71920] hover:bg-red-50 transition"
+                    >
+                      <h3 className="text-lg font-semibold text-slate-900">{cafe.name}</h3>
+                      {cafe.location && (
+                        <p className="text-sm text-slate-600 mt-1">{cafe.location}</p>
+                      )}
+                      {cafe.description && (
+                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">
+                          {cafe.description}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-12 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Seçili kafeterya</p>
+              <h2 className="text-2xl font-semibold text-slate-900">{selectedCafeteria.name}</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="cafeteria-switch" className="text-sm text-slate-600 whitespace-nowrap">
+                Kafeterya değiştir
+              </label>
+              <select
+                id="cafeteria-switch"
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm min-w-[200px]"
+                value={selectedCafeteria.id}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  if (id === 0) {
+                    requestCafeteriaChange(null);
+                    return;
+                  }
+                  const cafe = activeCafeterias.find((c) => c.id === id);
+                  if (cafe) requestCafeteriaChange(cafe);
+                }}
+              >
+                <option value={0}>Kafeterya listesine dön</option>
+                {activeCafeterias.map((cafe) => (
+                  <option key={cafe.id} value={cafe.id}>
+                    {cafe.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <aside className="xl:col-span-3">
             <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-5">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">
@@ -555,7 +734,11 @@ const CafeteriaOrderPage: React.FC = () => {
                 </span>
               </div>
 
-              {menuLoading ? (
+              {menuError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center text-red-700">
+                  {menuError}
+                </div>
+              ) : menuLoading ? (
                 <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
                   Menü yükleniyor...
                 </div>
@@ -806,6 +989,11 @@ const CafeteriaOrderPage: React.FC = () => {
                               <p className="text-sm text-slate-500">
                                 {order.createdAt} • Teslim: {order.selectedTime}
                               </p>
+                              {order.cafeteriaName && (
+                                <p className="text-sm text-slate-600 mt-1">
+                                  {order.cafeteriaName}
+                                </p>
+                              )}
                             </div>
 
                             <span
@@ -901,6 +1089,11 @@ const CafeteriaOrderPage: React.FC = () => {
                               <p className="text-sm text-slate-500">
                                 {order.createdAt} • Teslim: {order.selectedTime}
                               </p>
+                              {order.cafeteriaName && (
+                                <p className="text-sm text-slate-600 mt-1">
+                                  {order.cafeteriaName}
+                                </p>
+                              )}
                             </div>
 
                             <span
@@ -965,6 +1158,8 @@ const CafeteriaOrderPage: React.FC = () => {
               )}
             </div>
           </aside>
+        </div>
+          )}
         </div>
       </main>
     </div>

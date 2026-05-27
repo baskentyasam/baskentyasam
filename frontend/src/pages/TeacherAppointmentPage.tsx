@@ -8,6 +8,12 @@ import {
 } from "../services/appointmentService";
 import { getTeachers, Teacher } from "../services/teacherService";
 import { getInstructorSchedule, ScheduleSlot } from "../services/scheduleService";
+import {
+  FacultyOption,
+  DepartmentOption,
+  getActiveFaculties,
+  getDepartmentsByFaculty,
+} from "../services/academicDirectoryService";
 
 type Reason = "question" | "exam" | "other";
 type TabType = "request" | "myAppointments";
@@ -25,9 +31,20 @@ const TeacherAppointmentPage: React.FC = () => {
   const [time, setTime] = useState("");
   const [note, setNote] = useState("");
 
+  const [faculties, setFaculties] = useState<FacultyOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>([]);
+
+  const [facultyId, setFacultyId] = useState<number | "">("");
+  const [departmentId, setDepartmentId] = useState<number | "">("");
+
+  const [loadingFaculties, setLoadingFaculties] = useState(true);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
@@ -43,20 +60,85 @@ const TeacherAppointmentPage: React.FC = () => {
   /* ============================
      DATA LOAD
   ============================ */
+  const resetTeacherSelection = () => {
+    setLecturerName("");
+    setSchedule([]);
+    setDate("");
+    setTime("");
+  };
+
   useEffect(() => {
-    const loadTeachers = async () => {
-
+    const loadFaculties = async () => {
+      setLoadingFaculties(true);
+      setCatalogError("");
       try {
-        const data = await getTeachers();
-        setTeachers(data);
-      } catch (err) {
-        console.error("Öğretmen yükleme hatası:", err);
+        const data = await getActiveFaculties();
+        setFaculties(data);
+      } catch (err: any) {
+        setCatalogError(err?.message || "Fakülteler yüklenemedi.");
+        setFaculties([]);
       } finally {
-
+        setLoadingFaculties(false);
       }
     };
-    loadTeachers();
+    void loadFaculties();
   }, []);
+
+  useEffect(() => {
+    if (facultyId === "") {
+      setDepartments([]);
+      setDepartmentId("");
+      setTeachers([]);
+      resetTeacherSelection();
+      return;
+    }
+
+    const loadDepartments = async () => {
+      setLoadingDepartments(true);
+      setCatalogError("");
+      try {
+        const data = await getDepartmentsByFaculty(facultyId);
+        setDepartments(data);
+        if (data.length === 0) {
+          setCatalogError("Bu fakültede kayıtlı bölüm bulunamadı.");
+        }
+      } catch (err: any) {
+        setCatalogError(err?.message || "Bölümler yüklenemedi.");
+        setDepartments([]);
+      } finally {
+        setLoadingDepartments(false);
+      }
+    };
+    void loadDepartments();
+  }, [facultyId]);
+
+  useEffect(() => {
+    if (departmentId === "") {
+      setTeachers([]);
+      resetTeacherSelection();
+      return;
+    }
+
+    const loadTeachersForDepartment = async () => {
+      setLoadingTeachers(true);
+      setCatalogError("");
+      try {
+        const data = await getTeachers({ departmentId });
+        setTeachers(data);
+        resetTeacherSelection();
+        if (data.length === 0) {
+          setCatalogError("Bu bölümde randevuya açık öğretim elemanı bulunamadı.");
+        }
+      } catch (err: any) {
+        setCatalogError(err?.message || "Öğretim elemanları yüklenemedi.");
+        setTeachers([]);
+        resetTeacherSelection();
+      } finally {
+        setLoadingTeachers(false);
+      }
+    };
+    void loadTeachersForDepartment();
+  }, [departmentId]);
 
   const loadAppointments = async () => {
     setLoadingAppointments(true);
@@ -86,18 +168,26 @@ const TeacherAppointmentPage: React.FC = () => {
       if (lecturerName && teachers.length > 0) {
         const teacher = teachers.find((t) => t.name === lecturerName);
         if (teacher) {
+          setLoadingSchedule(true);
+          setCatalogError("");
           try {
             const data = await getInstructorSchedule(teacher.id);
             setSchedule(data);
-          } catch (err) {
-            console.error("Schedule loading error:", err);
+          } catch (err: any) {
+            setSchedule([]);
+            setCatalogError(
+              err?.message || "Öğretim elemanı programı yüklenemedi.",
+            );
+          } finally {
+            setLoadingSchedule(false);
           }
         }
       } else {
         setSchedule([]);
+        setLoadingSchedule(false);
       }
     };
-    fetchSchedule();
+    void fetchSchedule();
   }, [lecturerName, teachers]);
 
   // Tarih değiştiğinde saati sıfırla (seçilen saat artık müsait olmayabilir)
@@ -190,6 +280,10 @@ const TeacherAppointmentPage: React.FC = () => {
 
       alert("Randevu talebiniz başarıyla oluşturuldu.");
 
+      setFacultyId("");
+      setDepartmentId("");
+      setTeachers([]);
+      setDepartments([]);
       setLecturerName("");
       setCourse("");
       setReason("question");
@@ -197,6 +291,8 @@ const TeacherAppointmentPage: React.FC = () => {
       setDate("");
       setTime("");
       setNote("");
+      setSchedule([]);
+      setCatalogError("");
 
       await loadAppointments();
       setActiveTab("myAppointments");
@@ -260,19 +356,91 @@ const TeacherAppointmentPage: React.FC = () => {
               {/* ================= RANDEVU TALEBİ ================= */}
               {activeTab === "request" && (
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {catalogError && (
+                    <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      {catalogError}
+                    </p>
+                  )}
+
+                  <select
+                    value={facultyId === "" ? "" : String(facultyId)}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? "" : Number(e.target.value);
+                      setFacultyId(value);
+                      setDepartmentId("");
+                      setTeachers([]);
+                      resetTeacherSelection();
+                      setCatalogError("");
+                    }}
+                    required
+                    disabled={loadingFaculties}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  >
+                    <option value="">
+                      {loadingFaculties ? "Fakülteler yükleniyor..." : "Fakülte seçiniz"}
+                    </option>
+                    {faculties.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={departmentId === "" ? "" : String(departmentId)}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? "" : Number(e.target.value);
+                      setDepartmentId(value);
+                      setCatalogError("");
+                    }}
+                    required
+                    disabled={facultyId === "" || loadingDepartments}
+                    className="w-full border rounded px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {facultyId === ""
+                        ? "Önce fakülte seçiniz"
+                        : loadingDepartments
+                          ? "Bölümler yükleniyor..."
+                          : departments.length === 0
+                            ? "Bölüm bulunamadı"
+                            : "Bölüm seçiniz"}
+                    </option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+
                   <select
                     value={lecturerName}
                     onChange={(e) => setLecturerName(e.target.value)}
                     required
-                    className="w-full border rounded px-3 py-2 text-sm"
+                    disabled={
+                      departmentId === "" || loadingTeachers || teachers.length === 0
+                    }
+                    className="w-full border rounded px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    <option value="">Öğretim elemanı seçiniz</option>
+                    <option value="">
+                      {departmentId === ""
+                        ? "Önce bölüm seçiniz"
+                        : loadingTeachers
+                          ? "Öğretim elemanları yükleniyor..."
+                          : teachers.length === 0
+                            ? "Bu bölümde hoca bulunamadı"
+                            : "Öğretim elemanı seçiniz"}
+                    </option>
                     {teachers.map((t) => (
                       <option key={t.id} value={t.name}>
                         {t.name}
                       </option>
                     ))}
                   </select>
+
+                  {lecturerName && loadingSchedule && (
+                    <p className="text-xs text-slate-500">Öğretim elemanı programı yükleniyor...</p>
+                  )}
 
                   <input
                     value={course}

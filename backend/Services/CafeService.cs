@@ -7,7 +7,7 @@ namespace ApiProject.Services;
 
 public interface ICafeService
 {
-    Task<List<MenuItem>> GetMenuItemsAsync();
+    Task<List<MenuItem>> GetMenuItemsAsync(int? cafeteriaId = null);
     Task<CafeteriaOrderResponseDto> CreateOrderAsync(int userId, CreateOrderDto createOrderDto);
     Task<List<CafeteriaOrderResponseDto>> GetUserOrdersAsync(int userId);
     /// <summary>Durumu NotPaid (Ödenmedi) olan siparişlerin sayısı ve listesi.</summary>
@@ -40,10 +40,18 @@ public class CafeService : ICafeService
         { OrderStatus.NotPaid, "Ödenmedi" },
     };
 
-    public async Task<List<MenuItem>> GetMenuItemsAsync()
+    public async Task<List<MenuItem>> GetMenuItemsAsync(int? cafeteriaId = null)
     {
-        return await _context.MenuItems
+        var query = _context.MenuItems
             .Where(m => m.IsAvailable)
+            .AsQueryable();
+
+        if (cafeteriaId.HasValue)
+        {
+            query = query.Where(m => m.CafeteriaId == cafeteriaId.Value);
+        }
+
+        return await query
             .OrderBy(m => m.Name)
             .ToListAsync();
     }
@@ -63,6 +71,18 @@ public class CafeService : ICafeService
                 "Ödenmemiş sipariş limitine ulaştınız. Yeni sipariş vermeden önce lütfen eski siparişlerinizin ödemesini tamamlayın.");
         }
 
+        if (createOrderDto.CafeteriaId <= 0)
+        {
+            throw new InvalidOperationException("Geçerli bir kafeterya seçmelisiniz.");
+        }
+
+        var cafeteriaIdForOrder = createOrderDto.CafeteriaId;
+        var cafeteria = await _context.Cafeterias.FirstOrDefaultAsync(c => c.Id == cafeteriaIdForOrder);
+        if (cafeteria == null || !cafeteria.IsActive)
+        {
+            throw new InvalidOperationException("Seçilen kafeterya aktif değil veya bulunamadı.");
+        }
+
         decimal totalAmount = 0;
         var orderItems = new List<OrderItem>();
 
@@ -73,7 +93,12 @@ public class CafeService : ICafeService
                 throw new InvalidOperationException($"Menü öğesi bulunamadı. ID: {itemDto.MenuItemId}");
 
             if (!menuItem.IsAvailable)
-                throw new InvalidOperationException($"{menuItem.Name} şu anda mevcut değil.");
+                throw new InvalidOperationException($"{menuItem.Name} şu anda sipariş edilemiyor.");
+
+            if (!menuItem.CafeteriaId.HasValue || menuItem.CafeteriaId.Value != cafeteriaIdForOrder)
+            {
+                throw new InvalidOperationException("Seçilen ürünler bu kafeteryaya ait değil.");
+            }
 
             var orderItem = new OrderItem
             {
@@ -97,12 +122,14 @@ public class CafeService : ICafeService
             TotalAmount = totalAmount,
             PickupTime = createOrderDto.PickupTime,
             Note = createOrderDto.Note,
+            CafeteriaId = cafeteriaIdForOrder,
             OrderItems = orderItems
         };
 
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
+        await _context.Entry(order).Reference(o => o.Cafeteria).LoadAsync();
         await _context.Entry(order)
             .Collection(o => o.OrderItems)
             .Query()
@@ -127,6 +154,7 @@ public class CafeService : ICafeService
     {
         var orders = await _context.Orders
             .Where(o => o.UserId == userId)
+            .Include(o => o.Cafeteria)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.MenuItem)
             .OrderByDescending(o => o.CreatedAt)
@@ -175,6 +203,8 @@ public class CafeService : ICafeService
         return new CafeteriaOrderResponseDto
         {
             Id = order.Id,
+            CafeteriaId = order.CafeteriaId,
+            CafeteriaName = order.Cafeteria?.Name,
             OrderNumber = order.OrderNumber,
             CreatedAtUtc = order.CreatedAt,
             Items = order.OrderItems.Select(oi => new CafeteriaOrderItemResponseDto

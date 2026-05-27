@@ -17,9 +17,16 @@ public class MenuController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<MenuItem>>> GetMenuItems()
+    public async Task<ActionResult<List<MenuItem>>> GetMenuItems([FromQuery] int? cafeteriaId)
     {
-        var menuItems = await _cafeService.GetMenuItemsAsync();
+        var menuItems = await _cafeService.GetMenuItemsAsync(cafeteriaId);
+        return Ok(menuItems);
+    }
+
+    [HttpGet("by-cafeteria/{cafeteriaId:int}")]
+    public async Task<ActionResult<List<MenuItem>>> GetMenuItemsByCafeteria(int cafeteriaId)
+    {
+        var menuItems = await _cafeService.GetMenuItemsAsync(cafeteriaId);
         return Ok(menuItems);
     }
 }

@@ -75,12 +75,15 @@ const InstructorDashboard: React.FC = () => {
             </p>
           </button>
 
-          <div className="bg-white rounded-2xl border p-6 shadow">
+          <button
+            onClick={() => navigate("/otopark")}
+            className="text-left bg-white rounded-2xl border p-6 shadow hover:shadow-lg transition"
+          >
             <h3 className="text-lg font-semibold mb-2">Otopark Durumu</h3>
             <p className="text-slate-600">
               Otoparkın doluluk oranını görüntüleyin.
             </p>
-          </div>
+          </button>
         </div>
       </main>
 

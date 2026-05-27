@@ -10,6 +10,8 @@ public class Order
     
     [Required]
     public int UserId { get; set; }
+
+    public int? CafeteriaId { get; set; }
     
     [Required]
     [MaxLength(32)]
@@ -47,6 +49,9 @@ public class Order
     // Navigation Properties
     [ForeignKey("UserId")]
     public virtual User User { get; set; } = null!;
+
+    [ForeignKey(nameof(CafeteriaId))]
+    public virtual Cafeteria? Cafeteria { get; set; }
     
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 }
