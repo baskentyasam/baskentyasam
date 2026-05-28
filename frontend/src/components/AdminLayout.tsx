@@ -25,7 +25,7 @@ const AdminLayout: React.FC<Props> = ({ title, children, subtitle }) => {
     { to: "/admin/sub-admins", label: "Alt Admin Yönetimi", icon: "👥" },
     { to: "/admin/users", label: "Kullanıcı Yönetimi", icon: "👤" },
     { to: "/admin/cafeterias", label: "Kafeterya", icon: "🍽️" },
-    { label: "Kütüphane", icon: "📚", disabled: true },
+    { to: "/admin/library", label: "Kütüphane", icon: "📚" },
     { to: "/admin/parking", label: "Otopark", icon: "🅿️" },
     { to: "/admin/appointments", label: "Randevu", icon: "📅" },
   ];

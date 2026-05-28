@@ -9,6 +9,7 @@ public interface IDirectoryService
 {
     Task<List<CafeteriaListItemDto>> GetActiveCafeteriasAsync();
     Task<List<ParkingLotListItemDto>> GetActiveParkingLotsAsync();
+    Task<List<LibraryAreaListItemDto>> GetActiveLibraryAreasAsync();
     Task<List<AssignableScopeDto>> GetAssignableScopesAsync(AdminModuleType moduleType);
     Task<List<FacultyListItemDto>> GetActiveFacultiesAsync();
     Task<List<DepartmentListItemDto>> GetActiveDepartmentsAsync(int? facultyId);
@@ -53,6 +54,24 @@ public class DirectoryService : IDirectoryService
                 Capacity = p.Capacity,
                 CurrentOccupancy = p.CurrentOccupancy,
                 AvailableSlots = Math.Max(p.Capacity - p.CurrentOccupancy, 0)
+            })
+            .ToListAsync();
+    }
+
+    public async Task<List<LibraryAreaListItemDto>> GetActiveLibraryAreasAsync()
+    {
+        return await _context.LibraryAreas
+            .AsNoTracking()
+            .Where(l => l.IsActive)
+            .OrderBy(l => l.Name)
+            .Select(l => new LibraryAreaListItemDto
+            {
+                Id = l.Id,
+                Name = l.Name,
+                Location = l.Location,
+                Capacity = l.Capacity,
+                CurrentOccupancy = l.CurrentOccupancy,
+                AvailableSlots = Math.Max(l.Capacity - l.CurrentOccupancy, 0),
             })
             .ToListAsync();
     }
@@ -108,7 +127,7 @@ public class DirectoryService : IDirectoryService
     {
         var query = _context.Departments
             .AsNoTracking()
-            .Where(d => d.IsActive);
+            .Where(d => d.IsActive && d.Faculty.IsActive);
 
         if (facultyId.HasValue)
         {

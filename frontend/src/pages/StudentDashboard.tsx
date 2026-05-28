@@ -2,6 +2,22 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout, getCurrentUser } from "../services/authService";
 import NotificationBell from "../components/NotificationBell";
+import ProfileButton from "../components/ProfileButton";
+
+const tileClass =
+  "bg-white rounded-2xl border border-slate-200 p-5 shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center text-center min-h-[200px] max-h-[280px] overflow-hidden w-full";
+
+const TileImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => (
+  <div className="w-full flex-1 min-h-0 flex items-center justify-center mb-3 max-h-[7.5rem]">
+    <img
+      src={src}
+      alt={alt}
+      className="max-h-full max-w-full w-auto h-auto object-contain"
+      loading="lazy"
+      decoding="async"
+    />
+  </div>
+);
 
 const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -19,13 +35,13 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Üst bar */}
       <header className="w-full border-b bg-[#d71920] text-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
           <h1 className="text-2xl font-semibold">Başkent Yaşam – Öğrenci</h1>
           <div className="flex items-center gap-4 text-base">
             <span>Hoş Geldiniz, {user?.name || "Öğrenci"}</span>
             <NotificationBell />
+            <ProfileButton />
             <button
               onClick={openLogoutModal}
               className="hover:underline text-sm text-white"
@@ -36,61 +52,47 @@ const StudentDashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* İçerik - ortalanmış */}
       <main className="flex-1 flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-6xl">
-          {/* Genişletilmiş grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mx-auto">
-            {/* Görüşme */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 mx-auto auto-rows-fr">
             <section
               onClick={() => navigate("/randevu")}
-              className="bg-white rounded-2xl border border-slate-200 p-6 shadow hover:shadow-lg transition min-h-[150px] cursor-pointer"
+              className={tileClass}
             >
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              <TileImage src="/randevu.png" alt="Randevu" />
+              <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
                 Öğretim Elemanıyla Görüşme
               </h3>
-              <p className="text-slate-600 text-base">
-                Müsaitlik saatlerini görüp randevu talebi oluşturun.
-              </p>
             </section>
 
-            {/* Kütüphane */}
             <section
               onClick={() => navigate("/kutuphane")}
-              className="bg-white rounded-2xl border border-slate-200 p-6 shadow hover:shadow-lg transition min-h-[150px] cursor-pointer"
+              className={tileClass}
             >
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              <TileImage src="/kütüphane.png" alt="Kütüphane" />
+              <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
                 Kütüphane Doluluk
               </h3>
-              <p className="text-slate-600 text-base">
-                Kütüphanedeki anlık doluluk oranını görüntüleyin.
-              </p>
             </section>
 
-            {/* Kafeterya */}
             <section
               onClick={() => navigate("/kafeterya")}
-              className="bg-white rounded-2xl border border-slate-200 p-6 shadow hover:shadow-lg transition min-h-[150px] cursor-pointer"
+              className={tileClass}
             >
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              <TileImage src="/kafeterya.png" alt="Kafeterya" />
+              <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
                 Kafeterya Sipariş
               </h3>
-              <p className="text-slate-600 text-base">
-                Menüden yemek seçip ileriki bir saat için sipariş verin.
-              </p>
             </section>
 
-            {/* Otopark */}
             <section
               onClick={() => navigate("/otopark")}
-              className="bg-white rounded-2xl border border-slate-200 p-6 shadow hover:shadow-lg transition min-h-[150px] cursor-pointer"
+              className={tileClass}
             >
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                Otopark Durumu
+              <TileImage src="/otopark.png" alt="Otopark" />
+              <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
+                Otopark Doluluk
               </h3>
-              <p className="text-slate-600 text-base">
-                Otoparktaki anlık doluluk oranını görüntüleyin.
-              </p>
             </section>
           </div>
         </div>

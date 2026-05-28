@@ -18,6 +18,16 @@ public class ParkingLotListItemDto
     public int AvailableSlots { get; set; }
 }
 
+public class LibraryAreaListItemDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Location { get; set; }
+    public int Capacity { get; set; }
+    public int CurrentOccupancy { get; set; }
+    public int AvailableSlots { get; set; }
+}
+
 public class AssignableScopeDto
 {
     public string ScopeKey { get; set; } = string.Empty;

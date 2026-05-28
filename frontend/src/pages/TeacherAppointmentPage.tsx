@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   createAppointment,
@@ -6,11 +6,18 @@ import {
   Appointment,
   ApiError,
 } from "../services/appointmentService";
-import { getTeachers, Teacher } from "../services/teacherService";
-import { getInstructorSchedule, ScheduleSlot } from "../services/scheduleService";
 import {
-  FacultyOption,
+  getTeachers,
+  getTeacherCourses,
+  Teacher,
+} from "../services/teacherService";
+import {
+  getInstructorSchedule,
+  ScheduleSlot,
+} from "../services/scheduleService";
+import {
   DepartmentOption,
+  FacultyOption,
   getActiveFaculties,
   getDepartmentsByFaculty,
 } from "../services/academicDirectoryService";
@@ -18,57 +25,71 @@ import {
 type Reason = "question" | "exam" | "other";
 type TabType = "request" | "myAppointments";
 
+const getInitials = (name?: string): string => {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
 const TeacherAppointmentPage: React.FC = () => {
-
-
   const [activeTab, setActiveTab] = useState<TabType>("request");
 
-  const [lecturerName, setLecturerName] = useState("");
+  const [faculties, setFaculties] = useState<FacultyOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [facultyId, setFacultyId] = useState<number | "">("");
+  const [departmentId, setDepartmentId] = useState<number | "">("");
+  const [loadingFaculties, setLoadingFaculties] = useState(true);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [teacherCourses, setTeacherCourses] = useState<string[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
+
+  // Form alanları
   const [course, setCourse] = useState("");
   const [reason, setReason] = useState<Reason>("question");
   const [otherReason, setOtherReason] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [note, setNote] = useState("");
 
-  const [faculties, setFaculties] = useState<FacultyOption[]>([]);
-  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  // Diğer
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>([]);
-
-  const [facultyId, setFacultyId] = useState<number | "">("");
-  const [departmentId, setDepartmentId] = useState<number | "">("");
-
-  const [loadingFaculties, setLoadingFaculties] = useState(true);
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
-  const [loadingTeachers, setLoadingTeachers] = useState(false);
-  const [loadingSchedule, setLoadingSchedule] = useState(false);
-  const [catalogError, setCatalogError] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [error, setError] = useState("");
 
-  // Sabit saat listesi (09:00 - 17:00, 30dk ara ile)
   const ALL_TIME_SLOTS = [
     "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-    "15:00", "15:30", "16:00", "16:30"
+    "15:00", "15:30", "16:00", "16:30",
   ];
 
-  /* ============================
-     DATA LOAD
-  ============================ */
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const isWeekend = (() => {
+    if (!date) return false;
+    const d = new Date(date);
+    const day = d.getDay();
+    return day === 0 || day === 6;
+  })();
+
   const resetTeacherSelection = () => {
-    setLecturerName("");
+    setSelectedTeacher(null);
+    setTeacherSearch("");
+    setTeacherCourses([]);
+    setCourse("");
     setSchedule([]);
     setDate("");
     setTime("");
   };
 
   useEffect(() => {
-    const loadFaculties = async () => {
+    const loadFacultyList = async () => {
       setLoadingFaculties(true);
       setCatalogError("");
       try {
@@ -81,7 +102,7 @@ const TeacherAppointmentPage: React.FC = () => {
         setLoadingFaculties(false);
       }
     };
-    void loadFaculties();
+    void loadFacultyList();
   }, []);
 
   useEffect(() => {
@@ -93,12 +114,15 @@ const TeacherAppointmentPage: React.FC = () => {
       return;
     }
 
-    const loadDepartments = async () => {
+    const loadDepartmentList = async () => {
       setLoadingDepartments(true);
       setCatalogError("");
       try {
         const data = await getDepartmentsByFaculty(facultyId);
         setDepartments(data);
+        setDepartmentId("");
+        setTeachers([]);
+        resetTeacherSelection();
         if (data.length === 0) {
           setCatalogError("Bu fakültede kayıtlı bölüm bulunamadı.");
         }
@@ -109,7 +133,7 @@ const TeacherAppointmentPage: React.FC = () => {
         setLoadingDepartments(false);
       }
     };
-    void loadDepartments();
+    void loadDepartmentList();
   }, [facultyId]);
 
   useEffect(() => {
@@ -119,7 +143,7 @@ const TeacherAppointmentPage: React.FC = () => {
       return;
     }
 
-    const loadTeachersForDepartment = async () => {
+    const loadTeacherList = async () => {
       setLoadingTeachers(true);
       setCatalogError("");
       try {
@@ -137,9 +161,51 @@ const TeacherAppointmentPage: React.FC = () => {
         setLoadingTeachers(false);
       }
     };
-    void loadTeachersForDepartment();
+    void loadTeacherList();
   }, [departmentId]);
 
+  /* ============================
+     ARAMA İLE FİLTRELEME (frontend tarafı)
+  ============================ */
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearch.trim().toLowerCase();
+    if (!q) return teachers;
+    // İsmin ilk harfleri ya da herhangi bir kelimesinin baş harfleri ile başlasın
+    return teachers.filter((t) => {
+      const lower = (t.name || "").toLowerCase();
+      if (lower.startsWith(q)) return true;
+      return lower.split(/\s+/).some((part) => part.startsWith(q));
+    });
+  }, [teachers, teacherSearch]);
+
+  /* ============================
+     ÖĞRETMEN SEÇİLDİĞİNDE: dersleri + schedule yükle
+  ============================ */
+  useEffect(() => {
+    const loadDetails = async () => {
+      if (!selectedTeacher) {
+        setSchedule([]);
+        setTeacherCourses([]);
+        return;
+      }
+      try {
+        const [courses, scheduleData] = await Promise.all([
+          getTeacherCourses(selectedTeacher.id),
+          getInstructorSchedule(selectedTeacher.id),
+        ]);
+        setTeacherCourses(courses);
+        setSchedule(scheduleData);
+      } catch (err) {
+        console.error("Hoca detayları yüklenemedi:", err);
+      }
+    };
+    loadDetails();
+    setCourse(""); // Hoca değişince ders sıfırlansın
+  }, [selectedTeacher]);
+
+  /* ============================
+     RANDEVULAR
+  ============================ */
   const loadAppointments = async () => {
     setLoadingAppointments(true);
     try {
@@ -148,8 +214,8 @@ const TeacherAppointmentPage: React.FC = () => {
         data.filter(
           (a) =>
             a.status?.toLowerCase() === "approved" ||
-            a.status?.toLowerCase() === "rejected"
-        )
+            a.status?.toLowerCase() === "rejected",
+        ),
       );
     } catch (err) {
       console.error("Randevu yükleme hatası:", err);
@@ -162,93 +228,56 @@ const TeacherAppointmentPage: React.FC = () => {
     loadAppointments();
   }, []);
 
-  // Öğretmen seçildiğinde schedule'ı yükle
-  useEffect(() => {
-    const fetchSchedule = async () => {
-      if (lecturerName && teachers.length > 0) {
-        const teacher = teachers.find((t) => t.name === lecturerName);
-        if (teacher) {
-          setLoadingSchedule(true);
-          setCatalogError("");
-          try {
-            const data = await getInstructorSchedule(teacher.id);
-            setSchedule(data);
-          } catch (err: any) {
-            setSchedule([]);
-            setCatalogError(
-              err?.message || "Öğretim elemanı programı yüklenemedi.",
-            );
-          } finally {
-            setLoadingSchedule(false);
-          }
-        }
-      } else {
-        setSchedule([]);
-        setLoadingSchedule(false);
-      }
-    };
-    void fetchSchedule();
-  }, [lecturerName, teachers]);
-
-  // Tarih değiştiğinde saati sıfırla (seçilen saat artık müsait olmayabilir)
+  // Tarih veya hoca değiştiğinde saati sıfırla
   useEffect(() => {
     setTime("");
-  }, [date, lecturerName]);
+  }, [date, selectedTeacher]);
 
-  // Seçilen tarih için müsait saatleri hesapla
+  /* ============================
+     UYGUN SAATLER
+  ============================ */
   const getAvailableTimes = () => {
-    // Tarih seçili değilse boş dön
     if (!date) return [];
-
-    // Eğer schedule henüz yüklenmediyse veya boşsa, tüm saatler müsaittir (varsayım)
-    if (!schedule || schedule.length === 0) return ALL_TIME_SLOTS;
-
     const dateObj = new Date(date);
-    const day = dateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-
-    // Haftasonu ise (0 veya 6), boş dön
+    const day = dateObj.getDay();
     if (day === 0 || day === 6) return [];
 
-    // O güne ait DOLU slotları (hocanın derslerini) bul
-    // Format: "09:00" string'i
+    const now = new Date();
+    const isToday = date === todayStr;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let candidateSlots = ALL_TIME_SLOTS;
+    if (isToday) {
+      candidateSlots = ALL_TIME_SLOTS.filter((slot) => {
+        const [h, m] = slot.split(":").map(Number);
+        return h * 60 + m > currentMinutes;
+      });
+    }
+
+    if (!schedule || schedule.length === 0) return candidateSlots;
+
     const busyStarts = schedule
       .filter((s) => s.dayOfWeek === day)
-      .map(s => s.startTime);
+      .map((s) => s.startTime);
 
-    // Dersler 50 dk olduğu için, başlangıç saati VE bir sonraki 30 dk'lık dilim doludur.
-    // Örn: 09:00 dersi -> 09:00 ve 09:30 slotlarını kapatır.
     const allBusySlots: string[] = [];
-
     busyStarts.forEach((start) => {
       allBusySlots.push(start);
-      // Bir sonraki 30 dk slotunu bul
       const parts = start.split(":");
       if (parts.length === 2) {
         let h = parseInt(parts[0]);
         let m = parseInt(parts[1]);
-
-        // 30 dk ekle
         m += 30;
         if (m >= 60) {
           m -= 60;
           h += 1;
         }
-
-        const nextSlot = `${String(h).padStart(2, "0")}:${String(m).padStart(
-          2,
-          "0"
-        )}`;
+        const nextSlot = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
         allBusySlots.push(nextSlot);
       }
     });
 
-    // Tüm saatlerden dolu olanları çıkar
-    // Dolu olmayanlar = Müsait olanlar
-    const freeSlots = ALL_TIME_SLOTS.filter(
-      (slot) => !allBusySlots.includes(slot)
-    );
-
-    return freeSlots;
+    return candidateSlots.filter((slot) => !allBusySlots.includes(slot));
   };
 
   const availableTimes = getAvailableTimes();
@@ -259,8 +288,25 @@ const TeacherAppointmentPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
+    if (!selectedTeacher) {
+      setError("Lütfen bir öğretim elemanı seçiniz.");
+      return;
+    }
+    if (!course) {
+      setError("Lütfen bir ders seçiniz.");
+      return;
+    }
+    if (date && date < todayStr) {
+      setError("Geçmiş bir tarih seçilemez.");
+      return;
+    }
+    if (isWeekend) {
+      setError("Hafta sonu randevu alınamaz.");
+      return;
+    }
+
+    setLoading(true);
     try {
       const finalReason =
         reason === "other"
@@ -270,28 +316,21 @@ const TeacherAppointmentPage: React.FC = () => {
             : "Sınav kağıdına bakma";
 
       await createAppointment({
-        lecturerName,
+        lecturerName: selectedTeacher.name,
         course,
         reason: finalReason,
         date,
         time,
-        note: note || undefined,
       });
 
       alert("Randevu talebiniz başarıyla oluşturuldu.");
-
       setFacultyId("");
       setDepartmentId("");
-      setTeachers([]);
       setDepartments([]);
-      setLecturerName("");
-      setCourse("");
+      setTeachers([]);
+      resetTeacherSelection();
       setReason("question");
       setOtherReason("");
-      setDate("");
-      setTime("");
-      setNote("");
-      setSchedule([]);
       setCatalogError("");
 
       await loadAppointments();
@@ -309,7 +348,6 @@ const TeacherAppointmentPage: React.FC = () => {
   ============================ */
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* ÜST BAR */}
       <header className="w-full border-b bg-[#d71920] text-white">
         <div className="max-w-6xl mx-auto px-6 py-6 flex justify-between">
           <h1 className="text-2xl font-semibold">Öğretim Elemanıyla Görüşme</h1>
@@ -321,9 +359,7 @@ const TeacherAppointmentPage: React.FC = () => {
 
       <main className="flex-1 p-8">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 max-w-6xl mx-auto">
-          {/* SOL ANA KART */}
           <section className="lg:col-span-3 bg-white rounded-xl border shadow">
-            {/* SEKME BAŞLIKLARI */}
             <div className="flex border-b">
               <button
                 onClick={() => setActiveTab("request")}
@@ -334,7 +370,6 @@ const TeacherAppointmentPage: React.FC = () => {
               >
                 Randevu Talebi
               </button>
-
               <button
                 onClick={() => setActiveTab("myAppointments")}
                 className={`flex-1 py-3 text-sm font-medium ${activeTab === "myAppointments"
@@ -353,7 +388,6 @@ const TeacherAppointmentPage: React.FC = () => {
                 </div>
               )}
 
-              {/* ================= RANDEVU TALEBİ ================= */}
               {activeTab === "request" && (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {catalogError && (
@@ -362,93 +396,201 @@ const TeacherAppointmentPage: React.FC = () => {
                     </p>
                   )}
 
-                  <select
-                    value={facultyId === "" ? "" : String(facultyId)}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? "" : Number(e.target.value);
-                      setFacultyId(value);
-                      setDepartmentId("");
-                      setTeachers([]);
-                      resetTeacherSelection();
-                      setCatalogError("");
-                    }}
-                    required
-                    disabled={loadingFaculties}
-                    className="w-full border rounded px-3 py-2 text-sm"
-                  >
-                    <option value="">
-                      {loadingFaculties ? "Fakülteler yükleniyor..." : "Fakülte seçiniz"}
-                    </option>
-                    {faculties.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Fakülte
+                    </label>
+                    <select
+                      value={facultyId === "" ? "" : String(facultyId)}
+                      onChange={(e) => {
+                        const value = e.target.value === "" ? "" : Number(e.target.value);
+                        setFacultyId(value);
+                        setCatalogError("");
+                      }}
+                      required
+                      disabled={loadingFaculties}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    >
+                      <option value="">
+                        {loadingFaculties ? "Fakülteler yükleniyor..." : "Fakülte seçiniz"}
                       </option>
-                    ))}
-                  </select>
+                      {faculties.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <select
-                    value={departmentId === "" ? "" : String(departmentId)}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? "" : Number(e.target.value);
-                      setDepartmentId(value);
-                      setCatalogError("");
-                    }}
-                    required
-                    disabled={facultyId === "" || loadingDepartments}
-                    className="w-full border rounded px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    <option value="">
-                      {facultyId === ""
-                        ? "Önce fakülte seçiniz"
-                        : loadingDepartments
-                          ? "Bölümler yükleniyor..."
-                          : departments.length === 0
-                            ? "Bölüm bulunamadı"
-                            : "Bölüm seçiniz"}
-                    </option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Bölüm
+                    </label>
+                    <select
+                      value={departmentId === "" ? "" : String(departmentId)}
+                      onChange={(e) => {
+                        const value = e.target.value === "" ? "" : Number(e.target.value);
+                        setDepartmentId(value);
+                        setCatalogError("");
+                      }}
+                      required
+                      disabled={facultyId === "" || loadingDepartments}
+                      className="w-full border rounded px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      <option value="">
+                        {facultyId === ""
+                          ? "Önce fakülte seçiniz"
+                          : loadingDepartments
+                            ? "Bölümler yükleniyor..."
+                            : departments.length === 0
+                              ? "Bölüm bulunamadı"
+                              : "Bölüm seçiniz"}
                       </option>
-                    ))}
-                  </select>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <select
-                    value={lecturerName}
-                    onChange={(e) => setLecturerName(e.target.value)}
-                    required
-                    disabled={
-                      departmentId === "" || loadingTeachers || teachers.length === 0
-                    }
-                    className="w-full border rounded px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    <option value="">
-                      {departmentId === ""
-                        ? "Önce bölüm seçiniz"
-                        : loadingTeachers
-                          ? "Öğretim elemanları yükleniyor..."
-                          : teachers.length === 0
-                            ? "Bu bölümde hoca bulunamadı"
-                            : "Öğretim elemanı seçiniz"}
-                    </option>
-                    {teachers.map((t) => (
-                      <option key={t.id} value={t.name}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Öğretim Elemanı
+                    </label>
 
-                  {lecturerName && loadingSchedule && (
-                    <p className="text-xs text-slate-500">Öğretim elemanı programı yükleniyor...</p>
-                  )}
+                    {departmentId === "" ? (
+                      <p className="text-sm text-slate-500 border rounded px-3 py-2 bg-slate-50">
+                        Önce fakülte ve bölüm seçiniz.
+                      </p>
+                    ) : !selectedTeacher ? (
+                      <>
+                        <input
+                          type="text"
+                          value={teacherSearch}
+                          onChange={(e) => setTeacherSearch(e.target.value)}
+                          placeholder="Hoca adıyla ara (örn: meh)"
+                          disabled={loadingTeachers || teachers.length === 0}
+                          className="w-full border rounded px-3 py-2 text-sm mb-2 disabled:bg-slate-100"
+                        />
 
-                  <input
-                    value={course}
-                    onChange={(e) => setCourse(e.target.value)}
-                    placeholder="Ders"
-                    className="w-full border rounded px-3 py-2 text-sm"
-                  />
+                        <div className="max-h-64 overflow-y-auto border rounded divide-y">
+                          {loadingTeachers ? (
+                            <div className="p-3 text-sm text-slate-500">
+                              Yükleniyor...
+                            </div>
+                          ) : filteredTeachers.length === 0 ? (
+                            <div className="p-3 text-sm text-slate-500">
+                              Bu bölümde randevuya açık öğretim elemanı bulunamadı.
+                            </div>
+                          ) : (
+                            filteredTeachers.map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setSelectedTeacher(t)}
+                                className="w-full flex items-center gap-3 p-2 text-left hover:bg-slate-50"
+                              >
+                                <span className="flex-shrink-0 h-9 w-9 rounded-full overflow-hidden bg-gradient-to-br from-[#d71920] to-[#8a1014] flex items-center justify-center text-white text-xs font-bold">
+                                  {t.profileImage ? (
+                                    <img
+                                      src={t.profileImage}
+                                      alt={t.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    getInitials(t.name)
+                                  )}
+                                </span>
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-sm font-medium text-slate-900 truncate">
+                                    {t.name}
+                                  </span>
+                                  {t.department && (
+                                    <span className="block text-xs text-slate-500 truncate">
+                                      {t.department}
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-3 border rounded p-3 bg-slate-50">
+                        <span className="flex-shrink-0 h-12 w-12 rounded-full overflow-hidden bg-gradient-to-br from-[#d71920] to-[#8a1014] flex items-center justify-center text-white text-sm font-bold">
+                          {selectedTeacher.profileImage ? (
+                            <img
+                              src={selectedTeacher.profileImage}
+                              alt={selectedTeacher.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            getInitials(selectedTeacher.name)
+                          )}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">
+                            {selectedTeacher.name}
+                          </p>
+                          {selectedTeacher.department && (
+                            <p className="text-xs text-slate-500 truncate">
+                              {selectedTeacher.department}
+                            </p>
+                          )}
+                          {selectedTeacher.roomNumber && (
+                            <p className="text-xs text-slate-500 truncate">
+                              Oda: {selectedTeacher.roomNumber}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTeacher(null)}
+                          className="text-xs text-[#d71920] underline hover:opacity-80 shrink-0"
+                        >
+                          Değiştir
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
+                  {/* DERS */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Ders
+                    </label>
+                    {selectedTeacher && teacherCourses.length > 0 ? (
+                      <select
+                        value={course}
+                        onChange={(e) => setCourse(e.target.value)}
+                        required
+                        className="w-full border rounded px-3 py-2 text-sm"
+                      >
+                        <option value="">Ders seçiniz</option>
+                        {teacherCourses.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={course}
+                        onChange={(e) => setCourse(e.target.value)}
+                        placeholder={
+                          selectedTeacher
+                            ? "Bu hoca henüz ders eklememiş. Dersi yazabilirsiniz"
+                            : "Önce bir öğretim elemanı seçiniz"
+                        }
+                        disabled={!selectedTeacher}
+                        className="w-full border rounded px-3 py-2 text-sm disabled:bg-slate-100"
+                      />
+                    )}
+                  </div>
+
+                  {/* SEBEP */}
                   <div className="flex gap-4 text-sm">
                     <label>
                       <input
@@ -480,14 +622,17 @@ const TeacherAppointmentPage: React.FC = () => {
                     <textarea
                       value={otherReason}
                       onChange={(e) => setOtherReason(e.target.value)}
+                      placeholder="Sebebinizi yazın"
                       className="w-full border rounded px-3 py-2 text-sm"
                     />
                   )}
 
+                  {/* TARİH + SAAT */}
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       type="date"
                       value={date}
+                      min={todayStr}
                       onChange={(e) => setDate(e.target.value)}
                       required
                       className="border rounded px-3 py-2 text-sm"
@@ -497,14 +642,16 @@ const TeacherAppointmentPage: React.FC = () => {
                       onChange={(e) => setTime(e.target.value)}
                       required
                       className="border rounded px-3 py-2 text-sm w-full"
-                      disabled={!date || availableTimes.length === 0}
+                      disabled={!date || isWeekend || availableTimes.length === 0}
                     >
                       <option value="">
                         {!date
                           ? "Önce Tarih Seçiniz"
-                          : availableTimes.length === 0
-                            ? "Müsaitlik Yok"
-                            : "Saat Seçiniz"}
+                          : isWeekend
+                            ? "Hafta Sonu Seçilemez"
+                            : availableTimes.length === 0
+                              ? "Müsaitlik Yok"
+                              : "Saat Seçiniz"}
                       </option>
                       {availableTimes.map((t) => (
                         <option key={t} value={t}>
@@ -514,99 +661,109 @@ const TeacherAppointmentPage: React.FC = () => {
                     </select>
                   </div>
 
+                  {isWeekend && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
+                      Hafta sonu randevu alınamaz. Lütfen Pazartesi - Cuma arası bir tarih seçin.
+                    </div>
+                  )}
+
+                  {date && !isWeekend && availableTimes.length === 0 && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
+                      Seçtiğiniz gün için uygun saat bulunmuyor. Lütfen başka bir gün seçin.
+                    </div>
+                  )}
+
                   <button
-                    disabled={loading}
-                    className="w-full bg-[#d71920] text-white py-2 rounded"
+                    disabled={loading || isWeekend || !time || !selectedTeacher || !course}
+                    className="w-full bg-[#d71920] text-white py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Gönderiliyor..." : "Randevu Talep Et"}
                   </button>
                 </form>
               )}
 
-              {/* ================= RANDEVULARIM ================= */}
               {activeTab === "myAppointments" && (
                 <div className="space-y-3">
                   {loadingAppointments ? (
                     <p className="text-sm text-slate-500">Yükleniyor...</p>
                   ) : appointments.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      Henüz randevu yok.
-                    </p>
+                    <p className="text-sm text-slate-500">Henüz randevu yok.</p>
                   ) : (
-                    appointments.map((apt) => (
-                      <div
-                        key={apt.id}
-                        className={`p-4 rounded border ${apt.status?.toLowerCase() === "approved"
-                          ? "bg-green-50 border-green-200"
-                          : "bg-red-50 border-red-200"
-                          }`}
-                      >
-                        {/* Ders */}
-                        <p className="font-semibold text-sm text-slate-900">
-                          {(apt as any).subject ||
-                            apt.course ||
-                            "Ders belirtilmemiş"}
-                        </p>
-
-                        {/* Hoca */}
-                        <p className="text-xs text-slate-600 mt-1">
-                          Öğretim Elemanı:{" "}
-                          {(apt as any).teacherName ||
-                            (apt as any).lecturerName ||
-                            "Bilinmiyor"}
-                        </p>
-
-                        {/* Tarih – Saat */}
-                        <p className="text-xs text-slate-600">
-                          {apt.date
-                            ? new Date(apt.date).toLocaleDateString("tr-TR")
-                            : "Tarih yok"}{" "}
-                          –{" "}
-                          {apt.time
-                            ? typeof apt.time === "string"
-                              ? apt.time
-                              : `${String(
-                                (apt.time as any).hours || 0
-                              ).padStart(2, "0")}:${String(
-                                (apt.time as any).minutes || 0
-                              ).padStart(2, "0")}`
-                            : "Saat yok"}
-                        </p>
-
-                        {/* Durum */}
-                        <span
-                          className={`inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-medium ${apt.status?.toLowerCase() === "approved"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
+                    appointments.map((apt) => {
+                      const isApproved = apt.status?.toLowerCase() === "approved";
+                      return (
+                        <div
+                          key={apt.id}
+                          className={`p-4 rounded border ${isApproved
+                            ? "bg-green-50 border-green-200"
+                            : "bg-red-50 border-red-200"
                             }`}
                         >
-                          {apt.status?.toLowerCase() === "approved"
-                            ? "Onaylandı"
-                            : "Reddedildi"}
-                        </span>
-                      </div>
-                    ))
+                          <p className="font-semibold text-sm text-slate-900">
+                            {(apt as any).subject ||
+                              apt.course ||
+                              "Ders belirtilmemiş"}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-1">
+                            Öğretim Elemanı:{" "}
+                            {(apt as any).teacherName ||
+                              (apt as any).lecturerName ||
+                              "Bilinmiyor"}
+                            {apt.teacherDepartment && (
+                              <span className="text-slate-500">
+                                {" "}· {apt.teacherDepartment}
+                              </span>
+                            )}
+                          </p>
+                          {isApproved && apt.teacherRoomNumber && (
+                            <p className="text-xs text-slate-700 mt-0.5 font-medium">
+                              📍 Oda: {apt.teacherRoomNumber}
+                            </p>
+                          )}
+                          <p className="text-xs text-slate-600">
+                            {apt.date
+                              ? new Date(apt.date).toLocaleDateString("tr-TR")
+                              : "Tarih yok"}{" "}
+                            –{" "}
+                            {apt.time
+                              ? typeof apt.time === "string"
+                                ? apt.time
+                                : `${String(
+                                  (apt.time as any).hours || 0,
+                                ).padStart(2, "0")}:${String(
+                                  (apt.time as any).minutes || 0,
+                                ).padStart(2, "0")}`
+                              : "Saat yok"}
+                          </p>
+                          <span
+                            className={`inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-medium ${isApproved
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                              }`}
+                          >
+                            {isApproved ? "Onaylandı" : "Reddedildi"}
+                          </span>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}
             </div>
           </section>
 
-          {/* SAĞ BİLGİ PANELİ */}
-          <section className="lg:col-span-2 bg-white rounded-xl border p-5 shadow">
-            <h2 className="text-sm font-semibold mb-3">Bilgilendirme</h2>
-
+          <section className="lg:col-span-2 bg-white rounded-xl border p-5 shadow self-start h-auto">            <h2 className="text-sm font-semibold mb-3">Bilgilendirme</h2>
             <ul className="text-sm text-slate-600 space-y-2 list-disc pl-4">
-              <li>Randevular öğretim elemanı tarafından onaylanır veya reddedilir.</li>
-              <li>Randevu saatleri <strong>09:00 – 17:00</strong> arasıdır.</li>
-              <li>Seçilebilir saatler <strong>30 dakika</strong> aralıklarla listelenir.</li>
               <li>
-                Randevu durumunu <strong>“Randevularım”</strong> sekmesinden takip
-                edebilirsiniz.
+                Önce fakülte ve bölüm seçin; ardından hoca adıyla arama yapabilirsiniz.
+              </li>
+              <li>Seçilen hocanın verdiği dersler otomatik listelenir.</li>
+              <li>Randevu saatleri <strong>09:00 – 16:30</strong> arasıdır.</li>
+              <li>
+                Randevu durumunu <strong>"Randevularım"</strong> sekmesinden takip edebilirsiniz.
               </li>
             </ul>
           </section>
-
         </div>
       </main>
     </div>

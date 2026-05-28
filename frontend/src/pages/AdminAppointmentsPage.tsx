@@ -9,8 +9,14 @@ import {
   AdminScheduleSlot,
   AppointmentStatusFilter,
   STATUS_FILTER_OPTIONS,
+  activateAdminDepartment,
+  activateAdminFaculty,
   assignTeacherDepartment,
   cancelAdminAppointment,
+  createAdminDepartment,
+  createAdminFaculty,
+  deactivateAdminDepartment,
+  deactivateAdminFaculty,
   formatAppointmentDateTime,
   getAdminAppointmentTeachers,
   getAdminAppointments,
@@ -19,6 +25,8 @@ import {
   getAdminFacultyHierarchy,
   getAdminTeacherSchedule,
   setTeacherAppointmentVisibility,
+  updateAdminDepartment,
+  updateAdminFaculty,
 } from "../services/adminAppointmentService";
 
 type TabId = "appointments" | "teachers" | "schedule" | "faculty";
@@ -62,6 +70,14 @@ const AdminAppointmentsPage: React.FC = () => {
   const [modalFacultyId, setModalFacultyId] = useState<number | "">("");
   const [modalDepartmentId, setModalDepartmentId] = useState<number | "">("");
 
+  const [selectedFacultyId, setSelectedFacultyId] = useState<number | "">("");
+  const [showFacultyForm, setShowFacultyForm] = useState(false);
+  const [editingFaculty, setEditingFaculty] = useState<AdminFaculty | null>(null);
+  const [facultyFormName, setFacultyFormName] = useState("");
+  const [showDepartmentForm, setShowDepartmentForm] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<AdminDepartment | null>(null);
+  const [departmentFormName, setDepartmentFormName] = useState("");
+
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchDraft.trim()), 400);
     return () => window.clearTimeout(t);
@@ -72,10 +88,19 @@ const AdminAppointmentsPage: React.FC = () => {
     return allDepartments.filter((d) => d.facultyId === facultyFilter);
   }, [allDepartments, facultyFilter]);
 
+  const activeFaculties = useMemo(() => faculties.filter((f) => f.isActive), [faculties]);
+
   const modalDepartments = useMemo(() => {
     if (modalFacultyId === "") return [];
-    return allDepartments.filter((d) => d.facultyId === modalFacultyId);
+    return allDepartments.filter((d) => d.facultyId === modalFacultyId && d.isActive);
   }, [allDepartments, modalFacultyId]);
+
+  const selectedFaculty = useMemo(
+    () => facultyHierarchy.find((f) => f.id === selectedFacultyId) ?? null,
+    [facultyHierarchy, selectedFacultyId],
+  );
+
+  const selectedFacultyDepartments = selectedFaculty?.departments ?? [];
 
   const filteredTeachersForDropdown = useMemo(() => {
     let list = teachers;
@@ -148,7 +173,19 @@ const AdminAppointmentsPage: React.FC = () => {
   const loadHierarchy = useCallback(async () => {
     const data = await getAdminFacultyHierarchy();
     setFacultyHierarchy(data);
+    if (data.length === 0) {
+      setSelectedFacultyId("");
+      return;
+    }
+    setSelectedFacultyId((prev) => {
+      if (prev !== "" && data.some((f) => f.id === prev)) return prev;
+      return data[0].id;
+    });
   }, []);
+
+  const refreshFacultyCatalog = useCallback(async () => {
+    await Promise.all([loadCatalog(), loadHierarchy()]);
+  }, [loadCatalog, loadHierarchy]);
 
   useEffect(() => {
     const init = async () => {
@@ -295,7 +332,7 @@ const AdminAppointmentsPage: React.FC = () => {
     setModalDepartmentId("");
   };
 
-  const handleSaveDepartment = async (e: React.FormEvent) => {
+  const handleSaveTeacherDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deptModalTeacher) return;
 
@@ -314,6 +351,94 @@ const AdminAppointmentsPage: React.FC = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const resetFacultyForms = () => {
+    setShowFacultyForm(false);
+    setEditingFaculty(null);
+    setFacultyFormName("");
+  };
+
+  const resetDepartmentForms = () => {
+    setShowDepartmentForm(false);
+    setEditingDepartment(null);
+    setDepartmentFormName("");
+  };
+
+  const runFacultyCatalogAction = async (action: () => Promise<void>) => {
+    setActionLoading(true);
+    setError("");
+    try {
+      await action();
+      await refreshFacultyCatalog();
+      if (activeTab === "appointments") await loadAppointments();
+      if (activeTab === "teachers") await loadTeachers();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "İşlem tamamlanamadı.");
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveFaculty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = facultyFormName.trim();
+    if (!name) {
+      setError("Fakülte adı boş olamaz.");
+      return;
+    }
+
+    await runFacultyCatalogAction(async () => {
+      if (editingFaculty) {
+        await updateAdminFaculty(editingFaculty.id, name);
+      } else {
+        await createAdminFaculty(name);
+      }
+      resetFacultyForms();
+    });
+  };
+
+  const handleSaveDepartmentForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedFacultyId === "") {
+      setError("Önce bir fakülte seçin.");
+      return;
+    }
+    const name = departmentFormName.trim();
+    if (!name) {
+      setError("Bölüm adı boş olamaz.");
+      return;
+    }
+
+    await runFacultyCatalogAction(async () => {
+      if (editingDepartment) {
+        await updateAdminDepartment(editingDepartment.id, name);
+      } else {
+        await createAdminDepartment(selectedFacultyId, name);
+      }
+      resetDepartmentForms();
+    });
+  };
+
+  const handleToggleFacultyActive = async (faculty: AdminFaculty) => {
+    await runFacultyCatalogAction(async () => {
+      if (faculty.isActive) {
+        await deactivateAdminFaculty(faculty.id);
+      } else {
+        await activateAdminFaculty(faculty.id);
+      }
+    });
+  };
+
+  const handleToggleDepartmentActive = async (dept: AdminDepartment) => {
+    await runFacultyCatalogAction(async () => {
+      if (dept.isActive) {
+        await deactivateAdminDepartment(dept.id);
+      } else {
+        await activateAdminDepartment(dept.id);
+      }
+    });
   };
 
   const handleToggleVisibility = async (teacher: AdminAppointmentTeacher) => {
@@ -589,8 +714,18 @@ const AdminAppointmentsPage: React.FC = () => {
                       <tr key={t.id} className="hover:bg-slate-50/50">
                         <td className="px-6 py-4 font-medium text-slate-900">{t.name}</td>
                         <td className="px-6 py-4 text-slate-600">{t.email}</td>
-                        <td className="px-6 py-4 text-slate-600">{t.facultyName}</td>
-                        <td className="px-6 py-4 text-slate-600">{t.departmentName}</td>
+                        <td className="px-6 py-4 text-slate-600">
+                          {t.facultyName}
+                          {t.facultyId != null && t.facultyIsActive === false && (
+                            <span className="ml-1 text-xs text-amber-600">(pasif fakülte)</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-slate-600">
+                          {t.departmentName}
+                          {t.departmentId != null && t.departmentIsActive === false && (
+                            <span className="ml-1 text-xs text-amber-600">(pasif bölüm)</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4">
                           <span className={t.isActive ? "admin-badge-active" : "admin-badge-inactive"}>
                             {t.isActive ? "Aktif" : "Pasif"}
@@ -704,51 +839,274 @@ const AdminAppointmentsPage: React.FC = () => {
       )}
 
       {activeTab === "faculty" && (
-        <section className="admin-card admin-card-body">
-          <h3 className="mb-2 text-base font-semibold text-slate-900">Fakülte / Bölüm Yapısı</h3>
-          <p className="mb-6 text-sm text-slate-500">
-            Bu sekme salt okunurdur. Yeni fakülte/bölüm ekleme ve düzenleme sonraki aşamada eklenecektir.
-          </p>
+        <>
+          <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
+            <button
+              type="button"
+              className={showFacultyForm ? "admin-btn-secondary" : "admin-btn-primary"}
+              onClick={() => {
+                if (showFacultyForm) {
+                  resetFacultyForms();
+                } else {
+                  resetDepartmentForms();
+                  setEditingFaculty(null);
+                  setFacultyFormName("");
+                  setShowFacultyForm(true);
+                }
+              }}
+            >
+              {showFacultyForm ? "✕ İptal" : "+ Yeni Fakülte"}
+            </button>
+            {selectedFacultyId !== "" && (
+              <button
+                type="button"
+                className={showDepartmentForm ? "admin-btn-secondary" : "admin-btn-primary"}
+                disabled={!selectedFaculty?.isActive}
+                title={
+                  selectedFaculty?.isActive
+                    ? undefined
+                    : "Pasif fakülteye bölüm eklenemez"
+                }
+                onClick={() => {
+                  if (showDepartmentForm) {
+                    resetDepartmentForms();
+                  } else {
+                    resetFacultyForms();
+                    setEditingDepartment(null);
+                    setDepartmentFormName("");
+                    setShowDepartmentForm(true);
+                  }
+                }}
+              >
+                {showDepartmentForm ? "✕ İptal" : "+ Yeni Bölüm"}
+              </button>
+            )}
+          </div>
+
+          {showFacultyForm && (
+            <section className="admin-card admin-card-body mb-6">
+              <h3 className="mb-4 text-base font-semibold text-slate-900">
+                {editingFaculty ? "Fakülte Düzenle" : "Yeni Fakülte"}
+              </h3>
+              <form className="flex flex-wrap items-end gap-4" onSubmit={(e) => void handleSaveFaculty(e)}>
+                <div className="min-w-[240px] flex-1">
+                  <label className="admin-label">Fakülte adı *</label>
+                  <input
+                    className="admin-input"
+                    value={facultyFormName}
+                    onChange={(e) => setFacultyFormName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button type="submit" className="admin-btn-primary" disabled={actionLoading}>
+                    Kaydet
+                  </button>
+                  <button type="button" className="admin-btn-secondary" onClick={resetFacultyForms}>
+                    İptal
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
+
+          {showDepartmentForm && selectedFacultyId !== "" && (
+            <section className="admin-card admin-card-body mb-6">
+              <h3 className="mb-4 text-base font-semibold text-slate-900">
+                {editingDepartment ? "Bölüm Düzenle" : "Yeni Bölüm"}
+                {selectedFaculty && (
+                  <span className="ml-2 text-sm font-normal text-slate-500">— {selectedFaculty.name}</span>
+                )}
+              </h3>
+              <form className="flex flex-wrap items-end gap-4" onSubmit={(e) => void handleSaveDepartmentForm(e)}>
+                <div className="min-w-[240px] flex-1">
+                  <label className="admin-label">Bölüm adı *</label>
+                  <input
+                    className="admin-input"
+                    value={departmentFormName}
+                    onChange={(e) => setDepartmentFormName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button type="submit" className="admin-btn-primary" disabled={actionLoading}>
+                    Kaydet
+                  </button>
+                  <button type="button" className="admin-btn-secondary" onClick={resetDepartmentForms}>
+                    İptal
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
+
           {loading ? (
-            <div className="admin-empty">Yükleniyor...</div>
+            <div className="admin-card admin-card-body admin-empty">Yükleniyor...</div>
           ) : facultyHierarchy.length === 0 ? (
-            <div className="admin-empty">Kayıtlı fakülte bulunamadı.</div>
+            <div className="admin-card admin-card-body admin-empty">
+              Kayıtlı fakülte yok. &quot;+ Yeni Fakülte&quot; ile ekleyebilirsiniz.
+            </div>
           ) : (
-            <div className="space-y-6">
-              {facultyHierarchy.map((faculty) => (
-                <div key={faculty.id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-5">
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <h4 className="text-base font-semibold text-slate-900">{faculty.name}</h4>
-                    <span
-                      className={
-                        faculty.isActive ? "admin-badge-active" : "admin-badge-inactive"
-                      }
-                    >
-                      {faculty.isActive ? "Aktif" : "Pasif"}
-                    </span>
-                  </div>
-                  {faculty.departments.length === 0 ? (
-                    <p className="text-sm text-slate-500">Bölüm tanımlı değil.</p>
-                  ) : (
-                    <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {faculty.departments.map((dept) => (
-                        <li
-                          key={dept.id}
-                          className="rounded-lg border border-white bg-white px-3 py-2 text-sm text-slate-700"
+            <div className="grid gap-6 lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)]">
+              <section className="admin-card overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Fakülteler</h3>
+                </div>
+                <ul className="divide-y divide-slate-100">
+                  {facultyHierarchy.map((faculty) => {
+                    const isSelected = selectedFacultyId === faculty.id;
+                    const dimmed = !faculty.isActive;
+                    return (
+                      <li
+                        key={faculty.id}
+                        className={`px-5 py-4 transition-colors ${
+                          isSelected ? "bg-red-50/60" : "hover:bg-slate-50/80"
+                        } ${dimmed ? "opacity-80" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className="mb-2 w-full text-left"
+                          onClick={() => {
+                            setSelectedFacultyId(faculty.id);
+                            resetDepartmentForms();
+                          }}
                         >
-                          {dept.name}
-                          {!dept.isActive && (
-                            <span className="ml-2 text-xs text-slate-400">(pasif)</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-slate-900">{faculty.name}</span>
+                            <span
+                              className={
+                                faculty.isActive ? "admin-badge-active" : "admin-badge-inactive"
+                              }
+                            >
+                              {faculty.isActive ? "Aktif" : "Pasif"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {faculty.departments.length} bölüm
+                            {!faculty.isActive && " · öğrenci listesinde görünmez"}
+                          </p>
+                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="admin-btn-outline-gray"
+                            disabled={actionLoading}
+                            onClick={() => {
+                              resetDepartmentForms();
+                              setEditingFaculty({ id: faculty.id, name: faculty.name, isActive: faculty.isActive });
+                              setFacultyFormName(faculty.name);
+                              setShowFacultyForm(true);
+                            }}
+                          >
+                            Düzenle
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              faculty.isActive ? "admin-btn-outline-red" : "admin-btn-outline-blue"
+                            }
+                            disabled={actionLoading}
+                            onClick={() => void handleToggleFacultyActive(faculty)}
+                          >
+                            {faculty.isActive ? "Pasifleştir" : "Aktifleştir"}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+
+              <section className="admin-card overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {selectedFaculty ? selectedFaculty.name : "Bölümler"}
+                  </h3>
+                  {selectedFaculty && !selectedFaculty.isActive && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Fakülte pasif — öğrenci tarafında görünmez. Bölümler kayıtlı kalır; yeni bölüm eklenemez.
+                    </p>
                   )}
                 </div>
-              ))}
+                {!selectedFaculty ? (
+                  <div className="admin-card-body admin-empty">Bölümleri görmek için fakülte seçin.</div>
+                ) : selectedFacultyDepartments.length === 0 ? (
+                  <div className="admin-card-body admin-empty">Bu fakültede bölüm yok.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="border-b border-slate-100 bg-slate-50/50">
+                        <tr>
+                          <th className="px-6 py-3 font-medium text-slate-700">Bölüm</th>
+                          <th className="px-6 py-3 font-medium text-slate-700">Durum</th>
+                          <th className="px-6 py-3 font-medium text-slate-700">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedFacultyDepartments.map((dept) => {
+                          const visuallyInactive = !dept.isActive || !selectedFaculty.isActive;
+                          return (
+                            <tr
+                              key={dept.id}
+                              className={`hover:bg-slate-50/50 ${visuallyInactive ? "opacity-75" : ""}`}
+                            >
+                              <td className="px-6 py-4 font-medium text-slate-900">{dept.name}</td>
+                              <td className="px-6 py-4">
+                                {!selectedFaculty.isActive ? (
+                                  <span className="admin-badge-inactive">Fakülte pasif</span>
+                                ) : (
+                                  <span
+                                    className={
+                                      dept.isActive ? "admin-badge-active" : "admin-badge-inactive"
+                                    }
+                                  >
+                                    {dept.isActive ? "Aktif" : "Pasif"}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    className="admin-btn-outline-gray"
+                                    disabled={actionLoading}
+                                    onClick={() => {
+                                      resetFacultyForms();
+                                      setEditingDepartment(dept);
+                                      setDepartmentFormName(dept.name);
+                                      setShowDepartmentForm(true);
+                                    }}
+                                  >
+                                    Düzenle
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={
+                                      dept.isActive ? "admin-btn-outline-red" : "admin-btn-outline-blue"
+                                    }
+                                    disabled={actionLoading || !selectedFaculty.isActive}
+                                    title={
+                                      !selectedFaculty.isActive
+                                        ? "Önce fakülteyi aktifleştirin"
+                                        : undefined
+                                    }
+                                    onClick={() => void handleToggleDepartmentActive(dept)}
+                                  >
+                                    {dept.isActive ? "Pasifleştir" : "Aktifleştir"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
             </div>
           )}
-        </section>
+        </>
       )}
 
       {deptModalTeacher && (
@@ -765,7 +1123,7 @@ const AdminAppointmentsPage: React.FC = () => {
                 </button>
               </div>
 
-              <form className="space-y-4" onSubmit={(e) => void handleSaveDepartment(e)}>
+              <form className="space-y-4" onSubmit={(e) => void handleSaveTeacherDepartment(e)}>
                 <div>
                   <label className="admin-label">Fakülte</label>
                   <select
@@ -777,7 +1135,7 @@ const AdminAppointmentsPage: React.FC = () => {
                     }}
                   >
                     <option value="">Seçin</option>
-                    {faculties.map((f) => (
+                    {activeFaculties.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}
                       </option>

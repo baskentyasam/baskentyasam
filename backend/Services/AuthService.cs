@@ -24,6 +24,8 @@ public interface IAuthService
     Task RequestPasswordResetAsync(string email);
     /// <summary>Geçerli token ile şifreyi günceller; token tek kullanımlıktır.</summary>
     Task<bool> ResetPasswordWithTokenAsync(string plainToken, string newPassword);
+    Task<(bool Success, string? Error)> ChangePasswordAsync(int userId, string currentPassword, string newPassword);
+    Task<User?> GetUserByIdAsync(int userId);
 }
 
 public class AuthService : IAuthService
@@ -450,6 +452,45 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
         _logger.LogInformation("Şifre sıfırlama başarılı: UserId={UserId}", row.UserId);
         return true;
+    }
+
+    public async Task<(bool Success, string? Error)> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            return (false, "Mevcut ve yeni şifre gereklidir.");
+        }
+
+        if (newPassword.Length < 6)
+        {
+            return (false, "Yeni şifre en az 6 karakter olmalıdır.");
+        }
+
+        if (currentPassword == newPassword)
+        {
+            return (false, "Yeni şifre mevcut şifreden farklı olmalıdır.");
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+        {
+            return (false, "Kullanıcı bulunamadı.");
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+        {
+            return (false, "Mevcut şifre hatalı.");
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Şifre değiştirildi: UserId={UserId}", userId);
+        return (true, null);
+    }
+
+    public async Task<User?> GetUserByIdAsync(int userId)
+    {
+        return await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
     }
 
     private static string HashPasswordResetToken(string plain)

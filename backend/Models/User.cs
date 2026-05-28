@@ -33,6 +33,27 @@ public class User
 
     public bool IsActive { get; set; } = true;
 
+    public string? ProfileImage { get; set; }
+
+    /// <summary>Profil ekranındaki metin bölüm alanı (fakülte tablosu ile karışmaması için ayrı kolon).</summary>
+    [Column("profile_department")]
+    public string? ProfileDepartment { get; set; }
+
+    [MaxLength(50)]
+    public string? RoomNumber { get; set; }
+
+    [MaxLength(50)]
+    public string? PhoneNumber { get; set; }
+
+    [MaxLength(20)]
+    public string? ClassLevel { get; set; }
+
+    public string? Courses { get; set; }
+
+    public DateTime? FirstLoginAt { get; set; }
+
+    public DateTime? LastLoginAt { get; set; }
+
     public int? DepartmentId { get; set; }
 
     public bool IsVisibleForAppointment { get; set; } = true;

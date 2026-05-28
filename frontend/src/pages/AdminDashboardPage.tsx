@@ -32,10 +32,11 @@ const modules = [
     available: true,
   },
   {
+    to: "/admin/library",
     icon: "📚",
     title: "Kütüphane Yönetimi",
     description: "Doluluk ve kapasite yönetimi",
-    available: false,
+    available: true,
   },
   {
     to: "/admin/appointments",

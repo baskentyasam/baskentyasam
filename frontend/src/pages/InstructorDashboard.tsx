@@ -2,6 +2,22 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout, getCurrentUser } from "../services/authService";
 import NotificationBell from "../components/NotificationBell";
+import ProfileButton from "../components/ProfileButton";
+
+const tileClass =
+  "bg-white rounded-2xl border border-slate-200 p-5 shadow hover:shadow-lg transition flex flex-col items-center text-center min-h-[200px] max-h-[280px] overflow-hidden w-full";
+
+const TileImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => (
+  <div className="w-full flex-1 min-h-0 flex items-center justify-center mb-3 max-h-[7.5rem]">
+    <img
+      src={src}
+      alt={alt}
+      className="max-h-full max-w-full w-auto h-auto object-contain"
+      loading="lazy"
+      decoding="async"
+    />
+  </div>
+);
 
 const InstructorDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -19,7 +35,6 @@ const InstructorDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Üst bar */}
       <header className="w-full border-b bg-[#d71920] text-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
           <h1 className="text-2xl font-semibold">
@@ -30,6 +45,7 @@ const InstructorDashboard: React.FC = () => {
               Hoş Geldiniz, {user?.name || "Öğretim Elemanı"}
             </span>
             <NotificationBell />
+            <ProfileButton />
             <button
               onClick={openLogoutModal}
               className="hover:underline text-sm"
@@ -40,49 +56,50 @@ const InstructorDashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Kartlar */}
       <main className="flex-1 flex items-center justify-center px-6 py-10">
-        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Randevu Yönetimi */}
+        <div className="w-full max-w-6xl grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 auto-rows-fr">
           <button
+            type="button"
             onClick={() => navigate("/randevu-yonetimi")}
-            className="text-left bg-white rounded-2xl border p-6 shadow hover:shadow-lg transition"
+            className={tileClass}
           >
-            <h3 className="text-lg font-semibold mb-2">Randevu Yönetimi</h3>
-            <p className="text-slate-600">
-              Öğrencilerden gelen randevuları yönetin.
-            </p>
+            <TileImage src="/randevu.png" alt="Randevu" />
+            <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
+              Randevu Yönetimi
+            </h3>
           </button>
 
-          {/* Diğerleri (aynı) */}
           <button
+            type="button"
             onClick={() => navigate("/kutuphane")}
-            className="text-left bg-white rounded-2xl border p-6 shadow hover:shadow-lg transition"
+            className={tileClass}
           >
-            <h3 className="text-lg font-semibold mb-2">Kütüphane Doluluk</h3>
-            <p className="text-slate-600">
-              Kütüphanenin doluluk oranını görüntüleyin.
-            </p>
+            <TileImage src="/kütüphane.png" alt="Kütüphane" />
+            <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
+              Kütüphane Doluluk
+            </h3>
           </button>
 
           <button
+            type="button"
             onClick={() => navigate("/kafeterya")}
-            className="text-left bg-white rounded-2xl border p-6 shadow hover:shadow-lg transition"
+            className={tileClass}
           >
-            <h3 className="text-lg font-semibold mb-2">Kafeterya Sipariş</h3>
-            <p className="text-slate-600">
-              Menüden yemek seçip ileriki bir saat için sipariş verin.
-            </p>
+            <TileImage src="/kafeterya.png" alt="Kafeterya" />
+            <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
+              Kafeterya Sipariş
+            </h3>
           </button>
 
           <button
+            type="button"
             onClick={() => navigate("/otopark")}
-            className="text-left bg-white rounded-2xl border p-6 shadow hover:shadow-lg transition"
+            className={tileClass}
           >
-            <h3 className="text-lg font-semibold mb-2">Otopark Durumu</h3>
-            <p className="text-slate-600">
-              Otoparkın doluluk oranını görüntüleyin.
-            </p>
+            <TileImage src="/otopark.png" alt="Otopark" />
+            <h3 className="text-lg font-semibold text-slate-900 leading-snug line-clamp-2 break-words w-full shrink-0">
+              Otopark Doluluk
+            </h3>
           </button>
         </div>
       </main>

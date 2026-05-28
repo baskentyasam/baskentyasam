@@ -281,3 +281,83 @@ export const resetPasswordWithToken = async (token: string, newPassword: string)
   }
 };
 
+export interface MyProfile {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  studentNo?: string | null;
+  profileImage?: string | null;
+  department?: string | null;
+  roomNumber?: string | null;
+  phoneNumber?: string | null;
+  classLevel?: string | null;
+  courses?: string | null;
+  firstLoginAt?: string | null;
+  lastLoginAt?: string | null;
+}
+
+export interface UpdateProfilePayload {
+  profileImage?: string | null;
+  department?: string | null;
+  roomNumber?: string | null;
+  phoneNumber?: string | null;
+  classLevel?: string | null;
+  courses?: string | null;
+  studentNo?: string | null;
+}
+
+export const getMyProfile = async (): Promise<MyProfile> => {
+  try {
+    const res = await apiClient.get<MyProfile>('/Auth/me');
+    return res.data;
+  } catch (error: any) {
+    const msg =
+      error.response?.data?.message ||
+      error.response?.data?.title ||
+      error.message;
+    throw { message: msg || 'Profil bilgileri alınamadı.', status: error.response?.status } as ApiError;
+  }
+};
+
+export const updateMyProfile = async (payload: UpdateProfilePayload): Promise<MyProfile> => {
+  try {
+    const res = await apiClient.put<MyProfile & { message?: string }>('/Auth/me', payload, {
+      timeout: 60_000,
+    });
+    return res.data;
+  } catch (error: any) {
+    let msg =
+      error.response?.data?.message ||
+      error.response?.data?.title ||
+      error.message;
+
+    if (error.response?.status === 413) {
+      msg = 'Yüklenen veri sunucu için fazla büyük. Lütfen daha küçük bir fotoğraf seçin.';
+    } else if (error.code === 'ECONNABORTED') {
+      msg = 'Zaman aşımı. Lütfen tekrar deneyin.';
+    }
+
+    throw { message: msg || 'Profil güncellenemedi.', status: error.response?.status } as ApiError;
+  }
+};
+
+export const changePassword = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<string> => {
+  try {
+    const res = await apiClient.post<{ message: string }>('/Auth/change-password', {
+      currentPassword,
+      newPassword,
+    });
+    return res.data.message;
+  } catch (error: any) {
+    const msg =
+      error.response?.data?.message ||
+      error.response?.data?.title ||
+      error.message;
+    throw { message: msg || 'Şifre değiştirilemedi.', status: error.response?.status } as ApiError;
+  }
+};
+

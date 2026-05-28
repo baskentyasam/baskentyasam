@@ -26,6 +26,7 @@ import CashierOrdersPage from "./pages/CashierOrdersPage";
 
 import LibraryOccupancyPage from "./pages/LibraryOccupancyPage";
 import ParkingOccupancyPage from "./pages/ParkingOccupancyPage";
+import ProfilePage from "./pages/ProfilePage";
 
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 
@@ -44,6 +45,10 @@ import AdminCafeteriaDetailPage from "./pages/AdminCafeteriaDetailPage";
 import AdminParkingPage from "./pages/AdminParkingPage";
 
 import AdminParkingDetailPage from "./pages/AdminParkingDetailPage";
+
+import AdminLibraryPage from "./pages/AdminLibraryPage";
+
+import AdminLibraryDetailPage from "./pages/AdminLibraryDetailPage";
 
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import RequireRole from "./components/RequireRole";
@@ -237,8 +242,27 @@ function App() {
 
         />
 
+        <Route
+          path="/admin/library"
+          element={
+            <ProtectedAdminRoute requireSuperAdmin>
+              <AdminLibraryPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/library/:libraryAreaId"
+          element={
+            <ProtectedAdminRoute requireSuperAdmin>
+              <AdminLibraryDetailPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
         <Route path="/kutuphane" element={<LibraryOccupancyPage />} />
         <Route path="/otopark" element={<ParkingOccupancyPage />} />
+        <Route path="/profil" element={<ProfilePage />} />
 
       </Routes>
 

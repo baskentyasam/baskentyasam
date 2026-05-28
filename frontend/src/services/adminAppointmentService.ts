@@ -34,6 +34,8 @@ export interface AdminAppointmentTeacher {
   facultyName: string;
   departmentId?: number | null;
   departmentName: string;
+  departmentIsActive?: boolean | null;
+  facultyIsActive?: boolean | null;
   totalAppointments: number;
   pendingAppointments: number;
   approvedAppointments: number;
@@ -107,6 +109,52 @@ export const getAdminDepartments = async (facultyId?: number): Promise<AdminDepa
 
 export const getAdminFacultyHierarchy = async (): Promise<AdminFacultyHierarchy[]> => {
   const res = await apiClient.get<AdminFacultyHierarchy[]>("/admin/appointments/faculties/hierarchy");
+  return res.data;
+};
+
+export const createAdminFaculty = async (name: string): Promise<AdminFaculty> => {
+  const res = await apiClient.post<AdminFaculty>("/admin/appointments/faculties", { name });
+  return res.data;
+};
+
+export const updateAdminFaculty = async (id: number, name: string): Promise<AdminFaculty> => {
+  const res = await apiClient.put<AdminFaculty>(`/admin/appointments/faculties/${id}`, { name });
+  return res.data;
+};
+
+export const activateAdminFaculty = async (id: number): Promise<AdminFaculty> => {
+  const res = await apiClient.put<AdminFaculty>(`/admin/appointments/faculties/${id}/activate`);
+  return res.data;
+};
+
+export const deactivateAdminFaculty = async (id: number): Promise<AdminFaculty> => {
+  const res = await apiClient.put<AdminFaculty>(`/admin/appointments/faculties/${id}/deactivate`);
+  return res.data;
+};
+
+export const createAdminDepartment = async (
+  facultyId: number,
+  name: string,
+): Promise<AdminDepartment> => {
+  const res = await apiClient.post<AdminDepartment>("/admin/appointments/departments", {
+    facultyId,
+    name,
+  });
+  return res.data;
+};
+
+export const updateAdminDepartment = async (id: number, name: string): Promise<AdminDepartment> => {
+  const res = await apiClient.put<AdminDepartment>(`/admin/appointments/departments/${id}`, { name });
+  return res.data;
+};
+
+export const activateAdminDepartment = async (id: number): Promise<AdminDepartment> => {
+  const res = await apiClient.put<AdminDepartment>(`/admin/appointments/departments/${id}/activate`);
+  return res.data;
+};
+
+export const deactivateAdminDepartment = async (id: number): Promise<AdminDepartment> => {
+  const res = await apiClient.put<AdminDepartment>(`/admin/appointments/departments/${id}/deactivate`);
   return res.data;
 };
 

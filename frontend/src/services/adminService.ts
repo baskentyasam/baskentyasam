@@ -78,6 +78,16 @@ export interface ParkingLot {
   createdAt: string;
 }
 
+export interface LibraryArea {
+  id: number;
+  name: string;
+  location?: string;
+  capacity: number;
+  currentOccupancy: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface MyAdminAssignmentResponse {
   isSuperAdmin: boolean;
   role: string;
@@ -174,6 +184,36 @@ export const getParkingLotDetail = async (id: number) => {
 
 export const updateParkingMetrics = async (id: number, payload: { capacity: number; currentOccupancy: number }) => {
   const res = await apiClient.put<ParkingLot>(`/admin/parking/${id}/metrics`, payload);
+  return res.data;
+};
+
+export const getAdminLibraryAreas = async () => {
+  const res = await apiClient.get<LibraryArea[]>("/admin/library");
+  return res.data;
+};
+
+export const createLibraryArea = async (payload: Partial<LibraryArea>) => {
+  const res = await apiClient.post<LibraryArea>("/admin/library", payload);
+  return res.data;
+};
+
+export const updateLibraryArea = async (id: number, payload: Partial<LibraryArea>) => {
+  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}`, payload);
+  return res.data;
+};
+
+export const updateLibraryMetrics = async (id: number, payload: { capacity: number; currentOccupancy: number }) => {
+  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}/metrics`, payload);
+  return res.data;
+};
+
+export const activateLibraryArea = async (id: number) => {
+  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}/activate`);
+  return res.data;
+};
+
+export const deactivateLibraryArea = async (id: number) => {
+  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}/deactivate`);
   return res.data;
 };
 

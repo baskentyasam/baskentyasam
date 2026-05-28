@@ -20,6 +20,7 @@ namespace ApiProject.Data
         public DbSet<AdminAssignment> AdminAssignments { get; set; }
         public DbSet<Cafeteria> Cafeterias { get; set; }
         public DbSet<ParkingLot> ParkingLots { get; set; }
+        public DbSet<LibraryArea> LibraryAreas { get; set; }
         public DbSet<Faculty> Faculties { get; set; }
         public DbSet<Department> Departments { get; set; }
 
@@ -39,6 +40,7 @@ namespace ApiProject.Data
             modelBuilder.Entity<AdminAssignment>().ToTable("admin_assignments");
             modelBuilder.Entity<Cafeteria>().ToTable("cafeterias");
             modelBuilder.Entity<ParkingLot>().ToTable("parking_lots");
+            modelBuilder.Entity<LibraryArea>().ToTable("library_areas");
             modelBuilder.Entity<Faculty>().ToTable("faculties");
             modelBuilder.Entity<Department>().ToTable("departments");
 
@@ -74,6 +76,14 @@ namespace ApiProject.Data
                 entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
                 entity.Property(e => e.StudentNo).HasColumnName("staff_id");
                 entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.ProfileImage).HasColumnName("profile_image");
+                entity.Property(e => e.ProfileDepartment).HasColumnName("profile_department");
+                entity.Property(e => e.RoomNumber).HasColumnName("room_number");
+                entity.Property(e => e.PhoneNumber).HasColumnName("phone_number");
+                entity.Property(e => e.ClassLevel).HasColumnName("class_level");
+                entity.Property(e => e.Courses).HasColumnName("courses");
+                entity.Property(e => e.FirstLoginAt).HasColumnName("first_login_at");
+                entity.Property(e => e.LastLoginAt).HasColumnName("last_login_at");
                 entity.Property(e => e.DepartmentId).HasColumnName("department_id");
                 entity.Property(e => e.IsVisibleForAppointment)
                     .HasColumnName("is_visible_for_appointment")
@@ -148,6 +158,18 @@ namespace ApiProject.Data
             });
 
             modelBuilder.Entity<ParkingLot>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.Location).HasColumnName("location");
+                entity.Property(e => e.Capacity).HasColumnName("capacity");
+                entity.Property(e => e.CurrentOccupancy).HasColumnName("current_occupancy");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => e.Name).IsUnique();
+            });
+
+            modelBuilder.Entity<LibraryArea>(entity =>
             {
                 entity.Property(e => e.Id).HasColumnName("id");
                 entity.Property(e => e.Name).HasColumnName("name");
