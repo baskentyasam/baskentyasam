@@ -21,6 +21,8 @@ namespace ApiProject.Data
         public DbSet<Cafeteria> Cafeterias { get; set; }
         public DbSet<ParkingLot> ParkingLots { get; set; }
         public DbSet<LibraryArea> LibraryAreas { get; set; }
+        public DbSet<LibraryFloor> LibraryFloors { get; set; }
+        public DbSet<LibraryStatus> LibraryStatuses { get; set; }
         public DbSet<Faculty> Faculties { get; set; }
         public DbSet<Department> Departments { get; set; }
 
@@ -41,6 +43,8 @@ namespace ApiProject.Data
             modelBuilder.Entity<Cafeteria>().ToTable("cafeterias");
             modelBuilder.Entity<ParkingLot>().ToTable("parking_lots");
             modelBuilder.Entity<LibraryArea>().ToTable("library_areas");
+            modelBuilder.Entity<LibraryFloor>().ToTable("library_floors");
+            modelBuilder.Entity<LibraryStatus>().ToTable("library_status");
             modelBuilder.Entity<Faculty>().ToTable("faculties");
             modelBuilder.Entity<Department>().ToTable("departments");
 
@@ -78,6 +82,7 @@ namespace ApiProject.Data
                 entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
                 entity.Property(e => e.ProfileImage).HasColumnName("profile_image");
                 entity.Property(e => e.ProfileDepartment).HasColumnName("profile_department");
+                entity.Property(e => e.ProfileFaculty).HasColumnName("profile_faculty");
                 entity.Property(e => e.RoomNumber).HasColumnName("room_number");
                 entity.Property(e => e.PhoneNumber).HasColumnName("phone_number");
                 entity.Property(e => e.ClassLevel).HasColumnName("class_level");
@@ -179,6 +184,24 @@ namespace ApiProject.Data
                 entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");
                 entity.HasIndex(e => e.Name).IsUnique();
+            });
+
+            modelBuilder.Entity<LibraryFloor>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Code).HasColumnName("code");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.MaxCapacity).HasColumnName("max_capacity");
+                entity.Property(e => e.IsOpen).HasColumnName("is_open").HasDefaultValue(false);
+                entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+                entity.HasIndex(e => e.Code).IsUnique();
+            });
+
+            modelBuilder.Entity<LibraryStatus>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.CurrentOccupancy).HasColumnName("current_occupancy");
+                entity.Property(e => e.LastUpdatedAt).HasColumnName("last_updated_at");
             });
 
             // Appointment entity column mappings - snake_case kolon adları

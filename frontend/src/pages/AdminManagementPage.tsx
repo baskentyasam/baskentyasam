@@ -34,13 +34,20 @@ const AdminManagementPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (moduleType === "Library" || moduleType === "Appointment") {
-      setScopes([]);
-      setForm((f) => ({ ...f, scopeKey: "", scopeDisplayName: "" }));
-      return;
-    }
     getAssignableScopes(moduleType)
-      .then((s) => setScopes(s))
+      .then((s) => {
+        setScopes(s);
+        if (
+          s.length === 1 &&
+          (moduleType === "Library" || moduleType === "Appointment")
+        ) {
+          setForm((f) => ({
+            ...f,
+            scopeKey: s[0].scopeKey,
+            scopeDisplayName: s[0].scopeDisplayName,
+          }));
+        }
+      })
       .catch(() => setError("Kapsam listesi yüklenemedi."));
   }, [moduleType]);
 
@@ -124,8 +131,8 @@ const AdminManagementPage: React.FC = () => {
               >
                 <option value="Cafeteria">Kafeterya</option>
                 <option value="Parking">Otopark</option>
-                <option value="Library">Kütüphane (sonraki aşama)</option>
-                <option value="Appointment">Randevu (sonraki aşama)</option>
+                <option value="Library">Kütüphane</option>
+                <option value="Appointment">Randevu</option>
               </select>
             </div>
             <div className="md:col-span-2">
@@ -137,7 +144,7 @@ const AdminManagementPage: React.FC = () => {
                   const found = scopes.find((s) => s.scopeKey === e.target.value);
                   setForm((f) => ({ ...f, scopeKey: e.target.value, scopeDisplayName: found?.scopeDisplayName || "" }));
                 }}
-                disabled={moduleType === "Library" || moduleType === "Appointment"}
+                disabled={false}
                 required={moduleType === "Cafeteria" || moduleType === "Parking"}
               >
                 <option value="">Kapsam seçin</option>
@@ -153,7 +160,7 @@ const AdminManagementPage: React.FC = () => {
               <button
                 type="submit"
                 className="admin-btn-primary"
-                disabled={moduleType === "Library" || moduleType === "Appointment"}
+                disabled={false}
               >
                 Alt Admin Oluştur
               </button>

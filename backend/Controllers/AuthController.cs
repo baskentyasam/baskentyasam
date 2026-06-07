@@ -42,26 +42,24 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // Akıllı rol kontrolü backend koruması:
-        // Eğer kullanıcı adı bir rakamla başlıyorsa (öğrenci numarası gibi),
-        // Rol kesinlikle Student olmalıdır.
-        if (!string.IsNullOrWhiteSpace(registerDto.Username))
+        // E-posta yerel kısmına göre rol doğrulaması (22194373@... → öğrenci)
+        var roleCheckSource = !string.IsNullOrWhiteSpace(registerDto.Email)
+            ? registerDto.Email.Split('@')[0]
+            : registerDto.Username?.Trim() ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(roleCheckSource))
         {
-            char firstChar = registerDto.Username.Trim()[0];
+            char firstChar = roleCheckSource.Trim()[0];
             if (char.IsDigit(firstChar))
             {
                 if (registerDto.Role != UserRole.Student)
                 {
-                    return BadRequest(new { message = "Öğrenci numarası ile başlayan kullanıcı adları sadece 'Öğrenci' rolü ile kayıt olabilir." });
+                    return BadRequest(new { message = "Öğrenci e-posta adresleri yalnızca öğrenci olarak kayıt olabilir." });
                 }
             }
-            else
+            else if (registerDto.Role == UserRole.Student)
             {
-                // Rakamla BAŞLAMIYORSA (Harf vb.), Rol 'Student' OLAMAZ.
-                if (registerDto.Role == UserRole.Student)
-                {
-                    return BadRequest(new { message = "Harf ile başlayan kullanıcı adları 'Öğrenci' rolü ile kayıt olamaz. Lütfen 'Akademik Personel' rolünü seçiniz." });
-                }
+                return BadRequest(new { message = "Akademik personel e-posta adresleri öğrenci olarak kayıt olamaz." });
             }
         }
 
@@ -133,12 +131,21 @@ public class AuthController : ControllerBase
 
         try
         {
-            await _authService.RequestPasswordResetAsync(dto.Email);
-            return Ok(new
+            var devResetLink = await _authService.RequestPasswordResetAsync(dto.Email);
+            var response = new Dictionary<string, object>
             {
-                message =
+                ["message"] =
                     "Bu e-posta adresi sistemde kayıtlıysa, şifre sıfırlama bağlantısı gönderilmiştir. Gelen kutunuzu ve spam klasörünü kontrol edin."
-            });
+            };
+
+            if (_environment.IsDevelopment() && !string.IsNullOrWhiteSpace(devResetLink))
+            {
+                response["devResetLink"] = devResetLink;
+                response["message"] =
+                    "Development modu: SMTP yapılandırılmadığı için e-posta gönderilmedi. Aşağıdaki bağlantıyı kullanarak şifrenizi sıfırlayabilirsiniz.";
+            }
+
+            return Ok(response);
         }
         catch (InvalidOperationException ex)
         {
@@ -176,6 +183,10 @@ public class AuthController : ControllerBase
 
             return Ok(new { message = "Şifreniz başarıyla güncellendi." });
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             return StatusCode(500, ApiErrorHelper.ServerError(_environment, ex, "Şifre güncellenirken bir hata oluştu."));
@@ -206,6 +217,7 @@ public class AuthController : ControllerBase
             role = user.Role.ToString(),
             studentNo = user.StudentNo,
             profileImage = user.ProfileImage,
+            faculty = user.ProfileFaculty,
             department = user.ProfileDepartment,
             roomNumber = user.RoomNumber,
             phoneNumber = user.PhoneNumber,
@@ -237,6 +249,15 @@ public class AuthController : ControllerBase
             return NotFound(new { message = "Kullanıcı bulunamadı." });
         }
 
+        if (dto.Name != null)
+        {
+            var trimmedName = dto.Name.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmedName))
+            {
+                user.Name = trimmedName;
+            }
+        }
+
         if (dto.ProfileImage != null)
         {
             if (dto.ProfileImage.Length > 0 && dto.ProfileImage.Length > 3_500_000)
@@ -245,6 +266,11 @@ public class AuthController : ControllerBase
             }
 
             user.ProfileImage = string.IsNullOrWhiteSpace(dto.ProfileImage) ? null : dto.ProfileImage;
+        }
+
+        if (dto.Faculty != null)
+        {
+            user.ProfileFaculty = string.IsNullOrWhiteSpace(dto.Faculty) ? null : dto.Faculty.Trim();
         }
 
         if (dto.Department != null)
@@ -301,6 +327,7 @@ public class AuthController : ControllerBase
                 role = user.Role.ToString(),
                 studentNo = user.StudentNo,
                 profileImage = user.ProfileImage,
+                faculty = user.ProfileFaculty,
                 department = user.ProfileDepartment,
                 roomNumber = user.RoomNumber,
                 phoneNumber = user.PhoneNumber,
@@ -399,11 +426,28 @@ public class AuthController : ControllerBase
 
             if (departmentId.HasValue)
             {
+                var selectedDepartment = await _context.Departments
+                    .AsNoTracking()
+                    .Include(d => d.Faculty)
+                    .FirstOrDefaultAsync(d => d.Id == departmentId.Value && d.IsActive && d.Faculty.IsActive);
+
+                if (selectedDepartment == null)
+                {
+                    return Ok(Array.Empty<object>());
+                }
+
+                var deptNameLower = selectedDepartment.Name.ToLower();
                 teachersQuery = teachersQuery.Where(u =>
-                    u.DepartmentId == departmentId.Value &&
-                    u.Department != null &&
-                    u.Department.IsActive &&
-                    u.Department.Faculty.IsActive);
+                    (u.DepartmentId == departmentId.Value &&
+                     u.Department != null &&
+                     u.Department.IsActive &&
+                     u.Department.Faculty.IsActive) ||
+                    (u.DepartmentId == null &&
+                     u.ProfileDepartment != null &&
+                     u.ProfileDepartment.ToLower() == deptNameLower) ||
+                    (u.DepartmentId == null &&
+                     u.ProfileDepartment == null &&
+                     u.Department == null));
             }
             else if (facultyId.HasValue)
             {
@@ -444,6 +488,36 @@ public class AuthController : ControllerBase
                     courses = u.Courses,
                 })
                 .ToListAsync();
+
+            if (teachers.Count == 0 && departmentId.HasValue)
+            {
+                var fallbackDepartment = await _context.Departments
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(d => d.Id == departmentId.Value && d.IsActive);
+                if (fallbackDepartment != null)
+                {
+                    teachers = await _context.Users
+                        .AsNoTracking()
+                        .Include(u => u.Department)
+                        .Where(u => u.Role == UserRole.Teacher && u.IsActive && u.IsVisibleForAppointment &&
+                                    (u.DepartmentId == null ||
+                                     (u.Department != null && u.Department.FacultyId == fallbackDepartment.FacultyId)))
+                        .OrderBy(u => u.Name)
+                        .Select(u => new
+                        {
+                            id = u.Id,
+                            name = u.Name,
+                            role = u.Role.ToString(),
+                            studentNo = u.StudentNo,
+                            department = u.ProfileDepartment ?? (u.Department != null ? u.Department.Name : null),
+                            roomNumber = u.RoomNumber,
+                            phoneNumber = u.PhoneNumber,
+                            profileImage = u.ProfileImage,
+                            courses = u.Courses,
+                        })
+                        .ToListAsync();
+                }
+            }
 
             return Ok(teachers);
         }

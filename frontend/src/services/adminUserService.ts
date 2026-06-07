@@ -9,6 +9,9 @@ export interface AdminUser {
   isActive: boolean;
   studentNo?: string | null;
   isLegacyAdmin: boolean;
+  subAdminModuleType?: string | null;
+  subAdminScopeKey?: string | null;
+  subAdminScopeDisplayName?: string | null;
 }
 
 export interface UpdateAdminUserPayload {
@@ -17,16 +20,37 @@ export interface UpdateAdminUserPayload {
   studentNo?: string | null;
 }
 
+export interface UpdateAdminUserRolePayload {
+  role: string;
+  moduleType?: string;
+  scopeKey?: string;
+  scopeDisplayName?: string;
+}
+
 export type UserRoleFilter =
   | ""
   | "Student"
   | "Teacher"
   | "Staff"
   | "SuperAdmin"
-  | "SubAdmin"
-  | "Admin";
+  | "SubAdmin";
 
 export type UserStatusFilter = "all" | "active" | "inactive";
+
+export type AssignableAdminRole =
+  | "Student"
+  | "Teacher"
+  | "Staff"
+  | "SuperAdmin"
+  | "SubAdmin";
+
+export const ASSIGNABLE_ROLE_OPTIONS: { value: AssignableAdminRole; label: string }[] = [
+  { value: "Student", label: "Öğrenci" },
+  { value: "Teacher", label: "Öğretim Elemanı" },
+  { value: "Staff", label: "Kasiyer / Personel" },
+  { value: "SuperAdmin", label: "Admin Sistem Yöneticisi" },
+  { value: "SubAdmin", label: "Alt Admin" },
+];
 
 export const getAdminUsers = async (params?: {
   role?: string;
@@ -47,6 +71,18 @@ export const updateAdminUser = async (id: number, payload: UpdateAdminUserPayloa
   return res.data;
 };
 
+export const updateAdminUserRole = async (
+  id: number,
+  payload: UpdateAdminUserRolePayload,
+): Promise<AdminUser> => {
+  const res = await apiClient.put<AdminUser>(`/admin/users/${id}/role`, payload);
+  return res.data;
+};
+
+export const resetAdminUserPassword = async (id: number, newPassword: string): Promise<void> => {
+  await apiClient.put(`/admin/users/${id}/password`, { newPassword });
+};
+
 export const activateAdminUser = async (id: number): Promise<AdminUser> => {
   const res = await apiClient.put<AdminUser>(`/admin/users/${id}/activate`);
   return res.data;
@@ -62,7 +98,6 @@ export const ROLE_FILTER_OPTIONS: { value: UserRoleFilter; label: string }[] = [
   { value: "Student", label: "Öğrenci" },
   { value: "Teacher", label: "Öğretim Elemanı" },
   { value: "Staff", label: "Kasiyer / Personel" },
-  { value: "SuperAdmin", label: "Sistem Yöneticisi" },
+  { value: "SuperAdmin", label: "Admin Sistem Yöneticisi" },
   { value: "SubAdmin", label: "Alt Admin" },
-  { value: "Admin", label: "Legacy Admin" },
 ];

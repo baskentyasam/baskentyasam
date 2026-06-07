@@ -14,6 +14,9 @@ public class AdminUserListItemDto
 
 public class AdminUserDetailDto : AdminUserListItemDto
 {
+    public string? SubAdminModuleType { get; set; }
+    public string? SubAdminScopeKey { get; set; }
+    public string? SubAdminScopeDisplayName { get; set; }
 }
 
 public class UpdateAdminUserDto
@@ -21,6 +24,19 @@ public class UpdateAdminUserDto
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? StudentNo { get; set; }
+}
+
+public class UpdateAdminUserRoleDto
+{
+    public string Role { get; set; } = string.Empty;
+    public string? ModuleType { get; set; }
+    public string? ScopeKey { get; set; }
+    public string? ScopeDisplayName { get; set; }
+}
+
+public class ResetAdminUserPasswordDto
+{
+    public string NewPassword { get; set; } = string.Empty;
 }
 
 public class AdminUserListQuery

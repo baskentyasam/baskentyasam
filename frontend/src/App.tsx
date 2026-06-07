@@ -168,7 +168,7 @@ function App() {
 
           element={
 
-            <ProtectedAdminRoute requireSuperAdmin>
+            <ProtectedAdminRoute scopedModule="appointment">
 
               <AdminAppointmentsPage />
 
@@ -245,7 +245,7 @@ function App() {
         <Route
           path="/admin/library"
           element={
-            <ProtectedAdminRoute requireSuperAdmin>
+            <ProtectedAdminRoute scopedModule="library">
               <AdminLibraryPage />
             </ProtectedAdminRoute>
           }

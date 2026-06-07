@@ -34,6 +34,15 @@ services:
       Smtp__Password: ${SMTP_PASSWORD:-}
       Smtp__Username: ${SMTP_USERNAME:-}
       Smtp__FromEmail: ${SMTP_FROM_EMAIL:-}
+      Smtp__Host: ${SMTP_HOST:-smtp.gmail.com}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__FromName: ${SMTP_FROM_NAME:-Başkent Yaşam Platformu}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Başkent Yaşam Platformu}
       DisableHttpsRedirection: ${DISABLE_HTTPS_REDIRECTION:-true}
       APP_BASE_URL: ${API_BASE_URL:-http://localhost:5283}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}

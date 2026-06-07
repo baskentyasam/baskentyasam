@@ -14,9 +14,8 @@ public class LoginDto
     [JsonPropertyName("password")]
     public string Password { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Rol gereklidir")]
     [JsonPropertyName("role")]
-    public string RoleString { get; set; } = "Student";
+    public string? RoleString { get; set; }
 
     // Role property'si - string'den enum'a dönüştürülüyor
     [JsonIgnore]

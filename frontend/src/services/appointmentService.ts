@@ -3,6 +3,7 @@ import apiClient from '../api/axios';
 // Frontend'den gönderilen format
 export interface AppointmentRequest {
   lecturerName: string;
+  teacherId?: number;
   course: string;
   reason: string;
   date: string;
@@ -38,6 +39,7 @@ export interface Appointment {
   // Öğrenci ek bilgileri (öğretim elemanı paneli için)
   studentName?: string;
   studentNo?: string | null;
+  studentFaculty?: string | null;
   studentDepartment?: string | null;
   studentClassLevel?: string | null;
   studentProfileImage?: string | null;
@@ -54,14 +56,17 @@ export interface ApiError {
 
 // Helper to map backend DTO to frontend Appointment interface
 const mapDtoToAppointment = (dto: any): Appointment => {
+  const statusRaw = dto.status || dto.Status || "";
   return {
-    ...dto,
-    // Handle both camelCase and PascalCase from backend
-    reason: dto.requestReason || dto.RequestReason || dto.reason || '',
-    course: dto.subject || dto.Subject || dto.course || '',
+    id: String(dto.id ?? dto.Id ?? ""),
+    studentId: String(dto.studentId ?? dto.StudentId ?? ""),
+    instructorId: String(dto.teacherId ?? dto.TeacherId ?? dto.instructorId ?? dto.InstructorId ?? ""),
+    reason: dto.requestReason || dto.RequestReason || dto.reason || "",
+    course: dto.subject || dto.Subject || dto.course || "",
     note: dto.note || dto.rejectionReason || dto.RejectionReason,
     studentName: dto.studentName || dto.StudentName,
     studentNo: dto.studentNo ?? dto.StudentNo ?? null,
+    studentFaculty: dto.studentFaculty ?? dto.StudentFaculty ?? null,
     studentDepartment: dto.studentDepartment ?? dto.StudentDepartment ?? null,
     studentClassLevel: dto.studentClassLevel ?? dto.StudentClassLevel ?? null,
     studentProfileImage: dto.studentProfileImage ?? dto.StudentProfileImage ?? null,
@@ -71,7 +76,8 @@ const mapDtoToAppointment = (dto: any): Appointment => {
     teacherDepartment: dto.teacherDepartment ?? dto.TeacherDepartment ?? null,
     date: dto.date || dto.Date,
     time: dto.time || dto.Time,
-    status: dto.status || dto.Status,
+    status: statusRaw.toLowerCase() as Appointment["status"],
+    createdAt: dto.createdAt || dto.CreatedAt || "",
   };
 };
 
@@ -131,7 +137,8 @@ export const createAppointment = async (
     }
 
     const backendRequest: BackendAppointmentRequest = {
-      teacherName: teacherNameValue, // Öğretmen adı ile
+      teacherId: appointment.teacherId,
+      teacherName: teacherNameValue,
       date: isoDateTime,
       time: timeString, // String format: "HH:mm" (örn: "14:30")
       subject: appointment.course.trim(), // course -> subject, boşlukları temizle

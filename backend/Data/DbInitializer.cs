@@ -1,4 +1,5 @@
 using ApiProject.Models;
+using ApiProject.Services;
 using BCrypt.Net;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
@@ -13,6 +14,8 @@ namespace ApiProject.Data
         public static void Initialize(AppDbContext context, IHostEnvironment environment)
         {
             context.Database.EnsureCreated();
+
+            EnsureUserProfileFacultyColumn(context);
 
             EnsureRoleCatalogRecords(context);
             DeactivateLegacyAdmins(context);
@@ -37,6 +40,8 @@ namespace ApiProject.Data
             EnsureParkingLot(context, "Ana Giriş Otopark", "Ana Kampüs Girişi", 400, 160);
 
             EnsureFacultyDepartments(context);
+            EnsureDevelopmentTeacherDepartments(context);
+            EnsureLibraryFloors(context);
 
             var pergelCafeteria = context.Cafeterias.First(c => c.Name == "Pergel Kafe");
 
@@ -82,6 +87,12 @@ namespace ApiProject.Data
                     context.SaveChanges();
                 }
             }
+        }
+
+        private static void EnsureUserProfileFacultyColumn(AppDbContext context)
+        {
+            context.Database.ExecuteSqlRaw(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_faculty text;");
         }
 
         private static void SeedDevelopmentUsers(AppDbContext context)
@@ -317,6 +328,37 @@ namespace ApiProject.Data
             }),
         };
 
+        private static void EnsureDevelopmentTeacherDepartments(AppDbContext context)
+        {
+            var csDept = context.Departments.FirstOrDefault(d => d.Name == "Bilgisayar Mühendisliği");
+            if (csDept == null)
+            {
+                return;
+            }
+
+            var teachers = context.Users
+                .Where(u => u.Role == UserRole.Teacher && u.IsActive)
+                .ToList();
+
+            foreach (var teacher in teachers)
+            {
+                if (teacher.DepartmentId == null)
+                {
+                    teacher.DepartmentId = csDept.Id;
+                }
+
+                if (string.IsNullOrWhiteSpace(teacher.ProfileDepartment))
+                {
+                    teacher.ProfileDepartment = csDept.Name;
+                }
+            }
+
+            if (teachers.Count > 0)
+            {
+                context.SaveChanges();
+            }
+        }
+
         private static void EnsureFacultyDepartments(AppDbContext context)
         {
             foreach (var (facultyName, departments) in FacultyDepartmentSeed)
@@ -360,6 +402,30 @@ namespace ApiProject.Data
                         context.SaveChanges();
                     }
                 }
+            }
+        }
+
+        private static void EnsureLibraryFloors(AppDbContext context)
+        {
+            if (!context.LibraryFloors.Any())
+            {
+                var legacyOccupancy = 0;
+                if (context.LibraryAreas.Any())
+                {
+                    legacyOccupancy = context.LibraryAreas
+                        .Where(a => a.IsActive)
+                        .Select(a => a.CurrentOccupancy)
+                        .FirstOrDefault();
+                }
+
+                context.LibraryFloors.AddRange(LibraryFloorSeed.DefaultFloors());
+                context.LibraryStatuses.Add(new LibraryStatus
+                {
+                    Id = 1,
+                    CurrentOccupancy = legacyOccupancy,
+                    LastUpdatedAt = DateTime.UtcNow,
+                });
+                context.SaveChanges();
             }
         }
 

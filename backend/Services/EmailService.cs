@@ -1,48 +1,97 @@
 using System.Net;
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace ApiProject.Services;
 
 public interface IEmailService
 {
-    Task SendVerificationEmailAsync(string email, string name, string token, int userId);
-    Task SendPasswordResetEmailAsync(string email, string name, string resetLink, int validMinutes);
+    /// <returns>true = SMTP ile gönderildi; false = Development'ta simüle edildi.</returns>
+    Task<bool> SendVerificationEmailAsync(string email, string name, string token, int userId);
+    /// <returns>true = SMTP ile gönderildi; false = Development'ta simüle edildi.</returns>
+    Task<bool> SendPasswordResetEmailAsync(string email, string name, string resetLink, int validMinutes);
 }
 
 public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
+    private readonly IHostEnvironment _environment;
     private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
+    public EmailService(IConfiguration configuration, IHostEnvironment environment, ILogger<EmailService> logger)
     {
         _configuration = configuration;
+        _environment = environment;
         _logger = logger;
     }
 
-    public async Task SendVerificationEmailAsync(string email, string name, string token, int userId)
+    private sealed record SmtpConfig(string Host, int Port, string Username, string Password, string FromEmail, string FromName);
+
+    private SmtpConfig GetSmtpConfig()
+    {
+        var smtpSettings = _configuration.GetSection("Smtp");
+        return new SmtpConfig(
+            smtpSettings["Host"] ?? Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com",
+            int.Parse(smtpSettings["Port"] ?? Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587"),
+            Environment.GetEnvironmentVariable("SMTP_USERNAME") ?? smtpSettings["Username"] ?? "",
+            Environment.GetEnvironmentVariable("SMTP_PASSWORD") ?? smtpSettings["Password"] ?? "",
+            Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL") ?? smtpSettings["FromEmail"] ?? "",
+            smtpSettings["FromName"] ?? Environment.GetEnvironmentVariable("SMTP_FROM_NAME") ?? "Başkent Üniversitesi");
+    }
+
+    private static bool IsSmtpConfigured(SmtpConfig config)
+    {
+        var fromEmail = string.IsNullOrWhiteSpace(config.FromEmail) ? config.Username : config.FromEmail;
+        return !string.IsNullOrWhiteSpace(config.Username)
+               && !string.IsNullOrWhiteSpace(config.Password)
+               && !string.IsNullOrWhiteSpace(fromEmail);
+    }
+
+    private static string ResolveFromEmail(SmtpConfig config) =>
+        string.IsNullOrWhiteSpace(config.FromEmail) ? config.Username : config.FromEmail;
+
+    private void LogDevEmail(string title, string email, string link, string? extra = null)
+    {
+        _logger.LogWarning("SMTP yapılandırılmadı. Development modunda e-posta simüle ediliyor: {Email}", email);
+        Console.WriteLine("\n==========================================");
+        Console.WriteLine($"📧 {title} (Development - SMTP yok)");
+        Console.WriteLine("==========================================");
+        Console.WriteLine($"To: {email}");
+        Console.WriteLine($"Link: {link}");
+        if (!string.IsNullOrWhiteSpace(extra))
+            Console.WriteLine(extra);
+        Console.WriteLine("==========================================\n");
+    }
+
+    public async Task<bool> SendVerificationEmailAsync(string email, string name, string token, int userId)
     {
         try
         {
+            var smtpConfig = GetSmtpConfig();
             var smtpSettings = _configuration.GetSection("Smtp");
-            var smtpHost = smtpSettings["Host"] ?? "smtp.gmail.com";
-            var smtpPort = int.Parse(smtpSettings["Port"] ?? "587");
-            var smtpUsername = smtpSettings["Username"] ?? "";
-            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD")
-                ?? smtpSettings["Password"]
-                ?? "";
-            var smtpFromEmail = smtpSettings["FromEmail"] ?? smtpUsername;
-            var smtpFromName = smtpSettings["FromName"] ?? "Başkent Üniversitesi";
-            
+
             // BaseUrl'i environment variable'dan al (Docker için), yoksa config'den
-            var baseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") 
-                       ?? smtpSettings["BaseUrl"] 
+            var baseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL")
+                       ?? smtpSettings["BaseUrl"]
                        ?? "http://localhost:5283";
 
             // Doğrulama linki oluştur - Backend API endpoint'ine gider
             var verificationLink = $"{baseUrl}/api/auth/verify-email?token={token}&userId={userId}";
+
+            if (!IsSmtpConfigured(smtpConfig))
+            {
+                if (_environment.IsDevelopment())
+                {
+                    LogDevEmail("E-POSTA DOĞRULAMA", email, verificationLink, "Geçerlilik: 24 saat");
+                    return false;
+                }
+
+                throw new InvalidOperationException("E-posta servisi yapılandırılmamış. SMTP ayarlarını kontrol edin.");
+            }
+
+            var smtpFromEmail = ResolveFromEmail(smtpConfig);
 
             // Email içeriği
             var subject = "E-posta Doğrulama - Başkent Üniversitesi Yaşam Platformu";
@@ -137,14 +186,14 @@ public class EmailService : IEmailService
                 </html>
             ";
 
-            using (var client = new SmtpClient(smtpHost, smtpPort))
+            using (var client = new SmtpClient(smtpConfig.Host, smtpConfig.Port))
             {
                 client.EnableSsl = true;
-                client.Credentials = new NetworkCredential(smtpUsername, smtpPassword);
+                client.Credentials = new NetworkCredential(smtpConfig.Username, smtpConfig.Password);
 
                 using (var message = new MailMessage())
                 {
-                    message.From = new MailAddress(smtpFromEmail, smtpFromName);
+                    message.From = new MailAddress(smtpFromEmail, smtpConfig.FromName);
                     message.To.Add(new MailAddress(email, name));
                     message.Subject = subject;
                     message.Body = body;
@@ -166,6 +215,8 @@ public class EmailService : IEmailService
                     _logger.LogInformation($"Doğrulama email'i gönderildi: {email}");
                 }
             }
+
+            return true;
         }
         catch (Exception ex)
         {
@@ -174,19 +225,24 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendPasswordResetEmailAsync(string email, string name, string resetLink, int validMinutes)
+    public async Task<bool> SendPasswordResetEmailAsync(string email, string name, string resetLink, int validMinutes)
     {
         try
         {
-            var smtpSettings = _configuration.GetSection("Smtp");
-            var smtpHost = smtpSettings["Host"] ?? "smtp.gmail.com";
-            var smtpPort = int.Parse(smtpSettings["Port"] ?? "587");
-            var smtpUsername = smtpSettings["Username"] ?? "";
-            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD")
-                ?? smtpSettings["Password"]
-                ?? "";
-            var smtpFromEmail = smtpSettings["FromEmail"] ?? smtpUsername;
-            var smtpFromName = smtpSettings["FromName"] ?? "Başkent Üniversitesi";
+            var smtpConfig = GetSmtpConfig();
+
+            if (!IsSmtpConfigured(smtpConfig))
+            {
+                if (_environment.IsDevelopment())
+                {
+                    LogDevEmail("ŞİFRE SIFIRLAMA", email, resetLink, $"Geçerlilik: {validMinutes} dakika");
+                    return false;
+                }
+
+                throw new InvalidOperationException("E-posta servisi yapılandırılmamış. SMTP ayarlarını kontrol edin.");
+            }
+
+            var smtpFromEmail = ResolveFromEmail(smtpConfig);
 
             var subject = "Şifre Sıfırlama - Başkent Yaşam";
             var body = $@"
@@ -239,12 +295,12 @@ public class EmailService : IEmailService
                 </body>
                 </html>";
 
-            using var client = new SmtpClient(smtpHost, smtpPort);
+            using var client = new SmtpClient(smtpConfig.Host, smtpConfig.Port);
             client.EnableSsl = true;
-            client.Credentials = new NetworkCredential(smtpUsername, smtpPassword);
+            client.Credentials = new NetworkCredential(smtpConfig.Username, smtpConfig.Password);
 
             using var message = new MailMessage();
-            message.From = new MailAddress(smtpFromEmail, smtpFromName);
+            message.From = new MailAddress(smtpFromEmail, smtpConfig.FromName);
             message.To.Add(new MailAddress(email, name));
             message.Subject = subject;
             message.Body = body;
@@ -255,6 +311,7 @@ public class EmailService : IEmailService
             _logger.LogInformation("Şifre sıfırlama e-postası gönderiliyor: {Email}", email);
             await client.SendMailAsync(message);
             _logger.LogInformation("Şifre sıfırlama e-postası gönderildi: {Email}", email);
+            return true;
         }
         catch (Exception ex)
         {

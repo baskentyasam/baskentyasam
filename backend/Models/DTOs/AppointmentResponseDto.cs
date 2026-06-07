@@ -6,8 +6,14 @@ public class AppointmentResponseDto
     public int StudentId { get; set; }
     public string StudentName { get; set; } = string.Empty;
     public string? StudentNo { get; set; }
+    public string? StudentFaculty { get; set; }
+    public string? StudentDepartment { get; set; }
+    public string? StudentClassLevel { get; set; }
+    public string? StudentProfileImage { get; set; }
     public int TeacherId { get; set; }
     public string TeacherName { get; set; } = string.Empty;
+    public string? TeacherDepartment { get; set; }
+    public string? TeacherRoomNumber { get; set; }
     public DateTime Date { get; set; }
     public TimeSpan Time { get; set; }
     public string Subject { get; set; } = string.Empty;

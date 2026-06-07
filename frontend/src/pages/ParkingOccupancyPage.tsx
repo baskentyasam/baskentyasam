@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import OccupancyCharts from "../components/OccupancyCharts";
+import { useLiveOccupancyFeed } from "../hooks/useLiveOccupancyFeed";
 import { getCurrentUser } from "../services/authService";
 import {
   ActiveParkingLot,
@@ -7,69 +9,53 @@ import {
   getAvailableSlots,
   getOccupancyRate,
 } from "../services/parkingService";
-
-const REFRESH_INTERVAL_MS = 15000;
+import { buildCompareRates, trackOccupancyHistory } from "../utils/occupancyHistory";
 
 const ParkingOccupancyPage: React.FC = () => {
   const user = getCurrentUser();
   const isStudent = user?.role === "student";
 
-  const [lots, setLots] = useState<ActiveParkingLot[]>([]);
-  const [selectedLotId, setSelectedLotId] = useState<number | "">("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>("Veri bekleniyor...");
-
-  const selectedLot = useMemo(
-    () => lots.find((p) => p.id === selectedLotId) ?? null,
-    [lots, selectedLotId],
+  const loadLots = useCallback(() => getActiveParkingLots(), []);
+  const serializeLots = useCallback(
+    (items: ActiveParkingLot[]) =>
+      JSON.stringify(items.map((p) => [p.id, p.capacity, p.currentOccupancy])),
+    [],
   );
 
-  const loadLots = useCallback(async () => {
-    try {
-      const data = await getActiveParkingLots();
-      setLots(data);
-      setSelectedLotId((prev) => {
-        if (prev !== "" && data.some((p) => p.id === prev)) return prev;
-        return data.length > 0 ? data[0].id : "";
-      });
-      setLastUpdated(
-        new Date().toLocaleDateString("tr-TR") +
-          ", " +
-          new Date().toLocaleTimeString("tr-TR"),
-      );
-      setError(null);
-    } catch {
-      setError("Otopark listesi yüklenemedi.");
-      setLots([]);
-      setSelectedLotId("");
-    } finally {
-      setLoading(false);
+  const { data: lots, loading, error, lastUpdated } = useLiveOccupancyFeed(
+    loadLots,
+    serializeLots,
+  );
+
+  const [selectedLotId, setSelectedLotId] = useState<number | "">("");
+  const lotList = lots ?? [];
+
+  const effectiveSelectedId = useMemo(() => {
+    if (selectedLotId !== "" && lotList.some((p) => p.id === selectedLotId)) {
+      return selectedLotId;
     }
-  }, []);
+    return lotList.length > 0 ? lotList[0].id : "";
+  }, [lotList, selectedLotId]);
 
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    let cancelled = false;
-
-    const tick = async () => {
-      await loadLots();
-      if (cancelled) return;
-      timeoutId = setTimeout(tick, REFRESH_INTERVAL_MS);
-    };
-
-    void tick();
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [loadLots]);
+  const selectedLot = useMemo(
+    () => lotList.find((p) => p.id === effectiveSelectedId) ?? null,
+    [lotList, effectiveSelectedId],
+  );
 
   const totalCapacity = selectedLot?.capacity ?? 0;
   const currentCount = selectedLot?.currentOccupancy ?? 0;
   const availableSlots = selectedLot ? getAvailableSlots(selectedLot) : 0;
   const occupancyRate = selectedLot ? getOccupancyRate(selectedLot) : 0;
+
+  const hourlyData = useMemo(() => {
+    if (!selectedLot) return [];
+    return trackOccupancyHistory(
+      `parking-occupancy-${selectedLot.id}`,
+      occupancyRate,
+    );
+  }, [selectedLot, occupancyRate]);
+
+  const compareItems = useMemo(() => buildCompareRates(lotList), [lotList]);
 
   const getBarColor = (rate: number) => {
     if (rate <= 40) return "bg-green-500";
@@ -91,7 +77,7 @@ const ParkingOccupancyPage: React.FC = () => {
     return "Otopark şu anda oldukça dolu ya da yakın dolulukta.";
   };
 
-  if (loading && lots.length === 0) {
+  if (loading && lotList.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -124,7 +110,7 @@ const ParkingOccupancyPage: React.FC = () => {
             </div>
           )}
 
-          {lots.length === 0 ? (
+          {lotList.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-md border border-slate-200 p-10 text-center text-slate-600">
               Şu anda görüntülenecek aktif otopark bulunmuyor.
             </div>
@@ -141,12 +127,12 @@ const ParkingOccupancyPage: React.FC = () => {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Otopark</label>
                 <select
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
-                  value={selectedLotId === "" ? "" : String(selectedLotId)}
+                  value={effectiveSelectedId === "" ? "" : String(effectiveSelectedId)}
                   onChange={(e) =>
                     setSelectedLotId(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 >
-                  {lots.map((p) => (
+                  {lotList.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                       {p.location ? ` — ${p.location}` : ""}
@@ -197,14 +183,13 @@ const ParkingOccupancyPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center mb-6">
-                    <p className="text-sm font-medium text-slate-700">Saatlik yoğunluk grafiği</p>
-                    <p className="text-sm text-slate-500 mt-2">
-                      Gerçek zamanlı veri entegrasyonu sonraki aşamada eklenecektir.
-                    </p>
-                  </div>
+                  <OccupancyCharts
+                    title={selectedLot.name}
+                    hourly={hourlyData}
+                    compareItems={compareItems}
+                  />
 
-                  <div className="rounded-2xl bg-red-50 border border-red-100 p-5">
+                  <div className="rounded-2xl bg-red-50 border border-red-100 p-5 mt-6">
                     <p className="text-base text-slate-800 leading-7">
                       <span className="font-semibold">{selectedLot.name}</span> otoparkında toplam{" "}
                       <span className="font-semibold">{totalCapacity} araçlık</span> kapasite var; şu anda{" "}
@@ -215,11 +200,11 @@ const ParkingOccupancyPage: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-sm text-slate-600">
+                  <div className="mt-6 text-sm text-slate-600">
                     <p>
                       <span className="font-medium text-slate-800">Son güncelleme:</span> {lastUpdated}
                     </p>
-                    <p>Veriler her {REFRESH_INTERVAL_MS / 1000} saniyede bir yenilenir.</p>
+                    <p className="mt-1">Veriler yalnızca değiştiğinde ekranda güncellenir.</p>
                   </div>
                 </>
               )}

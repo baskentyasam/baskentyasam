@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using ApiProject.Models;
 using ApiProject.Models.DTOs;
 using ApiProject.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -7,14 +9,18 @@ namespace ApiProject.Controllers;
 
 [ApiController]
 [Route("api/admin/appointments")]
-[Authorize(Roles = "SuperAdmin")]
+[Authorize(Roles = "SuperAdmin,SubAdmin")]
 public class AdminAppointmentsController : ControllerBase
 {
     private readonly IAdminAppointmentManagementService _adminAppointmentService;
+    private readonly IAdminAuthorizationService _adminAuthorizationService;
 
-    public AdminAppointmentsController(IAdminAppointmentManagementService adminAppointmentService)
+    public AdminAppointmentsController(
+        IAdminAppointmentManagementService adminAppointmentService,
+        IAdminAuthorizationService adminAuthorizationService)
     {
         _adminAppointmentService = adminAppointmentService;
+        _adminAuthorizationService = adminAuthorizationService;
     }
 
     [HttpGet]
@@ -27,6 +33,12 @@ public class AdminAppointmentsController : ControllerBase
         [FromQuery] DateTime? to,
         [FromQuery] string? search)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         var result = await _adminAppointmentService.GetAppointmentsAsync(new AdminAppointmentListQuery
         {
             TeacherId = teacherId,
@@ -43,18 +55,36 @@ public class AdminAppointmentsController : ControllerBase
     [HttpGet("faculties")]
     public async Task<ActionResult<List<AdminFacultyListItemDto>>> GetFaculties()
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         return Ok(await _adminAppointmentService.GetFacultiesAsync());
     }
 
     [HttpGet("faculties/hierarchy")]
     public async Task<ActionResult<List<AdminFacultyWithDepartmentsDto>>> GetFacultyHierarchy()
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         return Ok(await _adminAppointmentService.GetFacultyHierarchyAsync());
     }
 
     [HttpPost("faculties")]
     public async Task<ActionResult<AdminFacultyListItemDto>> CreateFaculty([FromBody] CreateFacultyDto dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var created = await _adminAppointmentService.CreateFacultyAsync(dto);
@@ -69,6 +99,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPut("faculties/{id:int}")]
     public async Task<ActionResult<AdminFacultyListItemDto>> UpdateFaculty(int id, [FromBody] UpdateFacultyDto dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.UpdateFacultyAsync(id, dto);
@@ -88,6 +124,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPut("faculties/{id:int}/activate")]
     public async Task<ActionResult<AdminFacultyListItemDto>> ActivateFaculty(int id)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.ActivateFacultyAsync(id);
@@ -107,6 +149,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPut("faculties/{id:int}/deactivate")]
     public async Task<ActionResult<AdminFacultyListItemDto>> DeactivateFaculty(int id)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.DeactivateFacultyAsync(id);
@@ -126,6 +174,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPost("departments")]
     public async Task<ActionResult<AdminDepartmentListItemDto>> CreateDepartment([FromBody] CreateDepartmentDto dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var created = await _adminAppointmentService.CreateDepartmentAsync(dto);
@@ -140,6 +194,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPut("departments/{id:int}")]
     public async Task<ActionResult<AdminDepartmentListItemDto>> UpdateDepartment(int id, [FromBody] UpdateDepartmentDto dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.UpdateDepartmentAsync(id, dto);
@@ -159,6 +219,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPut("departments/{id:int}/activate")]
     public async Task<ActionResult<AdminDepartmentListItemDto>> ActivateDepartment(int id)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.ActivateDepartmentAsync(id);
@@ -178,6 +244,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpPut("departments/{id:int}/deactivate")]
     public async Task<ActionResult<AdminDepartmentListItemDto>> DeactivateDepartment(int id)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.DeactivateDepartmentAsync(id);
@@ -197,12 +269,24 @@ public class AdminAppointmentsController : ControllerBase
     [HttpGet("departments")]
     public async Task<ActionResult<List<AdminDepartmentListItemDto>>> GetDepartments([FromQuery] int? facultyId)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         return Ok(await _adminAppointmentService.GetDepartmentsAsync(facultyId));
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<AdminAppointmentListItemDto>> GetAppointment(int id)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         var item = await _adminAppointmentService.GetAppointmentByIdAsync(id);
         if (item == null)
         {
@@ -217,6 +301,12 @@ public class AdminAppointmentsController : ControllerBase
         int id,
         [FromBody] CancelAdminAppointmentDto? dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.CancelAppointmentAsync(id, dto?.Reason);
@@ -240,6 +330,12 @@ public class AdminAppointmentsController : ControllerBase
         [FromQuery] int? facultyId,
         [FromQuery] int? departmentId)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         var result = await _adminAppointmentService.GetTeachersAsync(search, isActive, facultyId, departmentId);
         return Ok(result);
     }
@@ -249,6 +345,12 @@ public class AdminAppointmentsController : ControllerBase
         int teacherId,
         [FromBody] AssignTeacherDepartmentDto dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var updated = await _adminAppointmentService.AssignTeacherDepartmentAsync(teacherId, dto.DepartmentId);
@@ -270,6 +372,12 @@ public class AdminAppointmentsController : ControllerBase
         int teacherId,
         [FromBody] SetTeacherAppointmentVisibilityDto dto)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         var updated = await _adminAppointmentService.SetTeacherAppointmentVisibilityAsync(
             teacherId,
             dto.IsVisibleForAppointment);
@@ -285,6 +393,12 @@ public class AdminAppointmentsController : ControllerBase
     [HttpGet("teachers/{teacherId:int}/schedule")]
     public async Task<ActionResult<List<ScheduleSlotResponseDto>>> GetTeacherSchedule(int teacherId)
     {
+        var denied = await EnsureAppointmentAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
             var schedule = await _adminAppointmentService.GetTeacherScheduleAsync(teacherId);
@@ -294,6 +408,39 @@ public class AdminAppointmentsController : ControllerBase
         {
             return NotFound(new { message = ex.Message });
         }
+    }
+
+    private async Task<ActionResult?> EnsureAppointmentAccessAsync()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        if (await _adminAuthorizationService.IsSuperAdminAsync(userId.Value))
+        {
+            return null;
+        }
+
+        try
+        {
+            await _adminAuthorizationService.EnsureModuleScopeAccessAsync(
+                userId.Value,
+                AdminModuleType.Appointment,
+                AdminAssignableScopes.AppointmentScopeKey);
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    private int? GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }
 

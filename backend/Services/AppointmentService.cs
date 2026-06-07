@@ -25,6 +25,14 @@ public class AppointmentService : IAppointmentService
     private readonly INotificationService _notificationService;
     private readonly ScheduleService _scheduleService;
 
+    private static IQueryable<Appointment> IncludeParticipants(IQueryable<Appointment> query) =>
+        query
+            .Include(a => a.Student!)
+                .ThenInclude(s => s.Department!)
+                    .ThenInclude(d => d.Faculty)
+            .Include(a => a.Teacher!)
+                .ThenInclude(t => t.Department);
+
     public AppointmentService(AppDbContext context, INotificationService notificationService, ScheduleService scheduleService)
     {
         _context = context;
@@ -34,9 +42,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<List<Appointment>> GetAllAppointmentsAsync()
     {
-        var appointments = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointments = await IncludeParticipants(_context.Appointments)
             .ToListAsync();
         
         if (appointments.Count == 0)
@@ -90,9 +96,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<Appointment?> GetAppointmentByIdAsync(int id)
     {
-        var appointment = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointment = await IncludeParticipants(_context.Appointments)
             .FirstOrDefaultAsync(a => a.Id == id);
         
         if (appointment != null)
@@ -418,9 +422,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<Appointment?> UpdateAppointmentAsync(int id, AppointmentUpdateDto dto)
     {
-        var appointment = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointment = await IncludeParticipants(_context.Appointments)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (appointment == null)
@@ -471,9 +473,7 @@ public class AppointmentService : IAppointmentService
         // Email'i normalize et (küçük harfe çevir, trim yap)
         var normalizedEmail = email?.ToLower().Trim() ?? string.Empty;
         
-        var appointments = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointments = await IncludeParticipants(_context.Appointments)
             .Where(a => a.Student != null && a.Student.Email.ToLower().Trim() == normalizedEmail)
             .ToListAsync();
         
@@ -562,9 +562,7 @@ public class AppointmentService : IAppointmentService
         // Email'i normalize et (küçük harfe çevir, trim yap)
         var normalizedEmail = email?.ToLower().Trim() ?? string.Empty;
         
-        var appointments = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointments = await IncludeParticipants(_context.Appointments)
             .Where(a => a.Teacher != null && a.Teacher.Email.ToLower().Trim() == normalizedEmail)
             .ToListAsync();
         
@@ -684,9 +682,7 @@ public class AppointmentService : IAppointmentService
             return new List<Appointment>();
         
         // ID'lere göre randevuları yükle
-        var appointments = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointments = await IncludeParticipants(_context.Appointments)
             .Where(a => appointmentIds.Contains(a.Id))
             .ToListAsync();
         
@@ -763,9 +759,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<Appointment?> ApproveAppointmentAsync(int id)
     {
-        var appointment = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointment = await IncludeParticipants(_context.Appointments)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (appointment == null)
@@ -806,9 +800,7 @@ public class AppointmentService : IAppointmentService
     {
         Console.WriteLine($"[DEBUG] RejectAppointmentAsync called - ID: {id}, Reason: {rejectionReason ?? "NULL"}");
         
-        var appointment = await _context.Appointments
-            .Include(a => a.Student)
-            .Include(a => a.Teacher)
+        var appointment = await IncludeParticipants(_context.Appointments)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (appointment == null)

@@ -476,7 +476,7 @@ public class OrderManagementService : IOrderManagementService
             CafeteriaName = order.Cafeteria?.Name,
             CustomerName = order.User?.Name,
             CustomerEmail = order.User?.Email,
-            StudentNo = order.User?.StudentNo,
+            StudentNo = order.UserType == OrderUserType.Student ? order.User?.StudentNo : null,
             UserType = order.UserType,
             TotalAmount = order.TotalAmount,
             Status = order.Status,

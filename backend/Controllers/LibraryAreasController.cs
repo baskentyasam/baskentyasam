@@ -8,17 +8,31 @@ namespace ApiProject.Controllers;
 [Route("api/library-areas")]
 public class LibraryAreasController : ControllerBase
 {
-    private readonly IDirectoryService _directoryService;
+    private readonly ILibraryManagementService _libraryService;
 
-    public LibraryAreasController(IDirectoryService directoryService)
+    public LibraryAreasController(ILibraryManagementService libraryService)
     {
-        _directoryService = directoryService;
+        _libraryService = libraryService;
     }
 
+    /// <summary>
+    /// Geriye dönük uyumluluk: tek kütüphane özeti döner.
+    /// </summary>
     [HttpGet("active")]
     public async Task<ActionResult<List<LibraryAreaListItemDto>>> GetActiveLibraryAreas()
     {
-        var areas = await _directoryService.GetActiveLibraryAreasAsync();
-        return Ok(areas);
+        var snapshot = await _libraryService.GetPublicSnapshotAsync();
+        return Ok(new List<LibraryAreaListItemDto>
+        {
+            new()
+            {
+                Id = 1,
+                Name = "Kütüphane",
+                Location = "Merkez Kampüs",
+                Capacity = snapshot.OpenCapacity,
+                CurrentOccupancy = snapshot.CurrentOccupancy,
+                AvailableSlots = snapshot.AvailableSlots,
+            },
+        });
     }
 }

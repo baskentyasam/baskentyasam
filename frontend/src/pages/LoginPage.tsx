@@ -1,22 +1,52 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login, register, ApiError } from "../services/authService";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "../utils/passwordPolicy";
+
+type AppRole = "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
+
+const inferRegisterRole = (email: string): "student" | "instructor" => {
+  const localPart = email.split("@")[0]?.trim() ?? "";
+  return /^\d/.test(localPart) ? "student" : "instructor";
+};
+
+const redirectByRole = (navigate: ReturnType<typeof useNavigate>, role: AppRole) => {
+  if (role === "student") {
+    navigate("/ogrenci", { replace: true });
+  } else if (role === "instructor") {
+    navigate("/ogretim-elemani", { replace: true });
+  } else if (role === "cashier") {
+    navigate("/kasiyer/siparisler", { replace: true });
+  } else if (role === "superadmin") {
+    navigate("/admin", { replace: true });
+  } else if (role === "subadmin") {
+    navigate("/admin/panel", { replace: true });
+  } else {
+    navigate("/", { replace: true });
+  }
+};
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"student" | "instructor" | "cashier" | "superadmin" | "subadmin">("student");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [showError, setShowError] = useState(false);
   const [success, setSuccess] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
-
   const [isSignup, setIsSignup] = useState(false);
 
-  // Hata mesajı gösterildiğinde animasyon için
+  const resetSignupFields = () => {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+  };
+
   useEffect(() => {
     if (error) {
       setShowError(true);
@@ -25,7 +55,6 @@ const LoginPage: React.FC = () => {
     }
   }, [error]);
 
-  // Başarı mesajı gösterildiğinde animasyon için
   useEffect(() => {
     if (success) {
       setShowSuccess(true);
@@ -43,43 +72,8 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Kasiyer kısayolu yalnızca development build'de (production'da görünmez/kullanılmaz)
-      const isDevelopment = process.env.NODE_ENV === "development";
-      const isCashierShortcut =
-        isDevelopment &&
-        username.trim().toLowerCase() === "kasiyer" &&
-        password === "123456";
-
-      const roleToUse = isCashierShortcut ? "cashier" : role;
-
-      const response = await login({ username, password, role: roleToUse });
-
-      // Başarılı giriş sonrası role göre yönlendir
-      const userRole = response.user.role;
-
-      if (userRole === "student") {
-        navigate("/ogrenci", { replace: true });
-      } else if (userRole === "instructor") {
-        navigate("/ogretim-elemani", { replace: true });
-      } else if (userRole === "cashier") {
-        navigate("/kasiyer/siparisler", { replace: true });
-      } else if (userRole === "superadmin") {
-        navigate("/admin", { replace: true });
-      } else if (userRole === "subadmin") {
-        navigate("/admin/panel", { replace: true });
-      } else {
-        if (role === "student") {
-          navigate("/ogrenci", { replace: true });
-        } else if (role === "instructor") {
-          navigate("/ogretim-elemani", { replace: true });
-        } else if (role === "superadmin") {
-          navigate("/admin", { replace: true });
-        } else if (role === "subadmin") {
-          navigate("/admin/panel", { replace: true });
-        } else {
-          navigate("/kasiyer/siparisler", { replace: true });
-        }
-      }
+      const response = await login({ username, password });
+      redirectByRole(navigate, response.user.role);
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.message || "Giriş yapılırken bir hata oluştu");
@@ -97,53 +91,48 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Eğer kullanıcı adı bir e-posta değilse, örnek bir e-posta kullan
-      const isEmail = username.includes("@");
-      const email = isEmail ? username : `${username}@example.com`;
-      const name = isEmail ? username.split("@")[0] : username;
+      const trimmedFirstName = firstName.trim();
+      const trimmedLastName = lastName.trim();
+      const trimmedEmail = email.trim();
+
+      if (!trimmedFirstName || !trimmedLastName) {
+        setError("Ad ve soyad zorunludur.");
+        return;
+      }
+
+      if (!trimmedEmail.includes("@")) {
+        setError("Geçerli bir e-posta adresi girin.");
+        return;
+      }
+
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
+
+      const registerRole = inferRegisterRole(trimmedEmail);
 
       const response = await register({
-        name,
-        email,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        email: trimmedEmail,
         password,
-        role: role === "cashier" || role === "superadmin" || role === "subadmin" ? "student" : role,
-        studentNo: role === "student" ? undefined : undefined,
+        role: registerRole,
       });
 
-      // KONTROL: Token yoksa (Email doğrulama gerekli) yönlendirme YAPMA
       if (!response.token) {
-        setSuccess("Kayıt başarılı! 🎉\n\nE-posta adresinize bir doğrulama linki gönderdik. Lütfen e-postanızı kontrol edin ve doğrulama linkine tıklayın.\n\nE-postayı bulamıyorsanız spam klasörünü kontrol etmeyi unutmayın.");
+        setSuccess(
+          "Kayıt başarılı! 🎉\n\nE-posta adresinize bir doğrulama linki gönderdik. Lütfen e-postanızı kontrol edin ve doğrulama linkine tıklayın.\n\nE-postayı bulamıyorsanız spam klasörünü kontrol etmeyi unutmayın.",
+        );
         setIsSignup(false);
-        setUsername("");
+        setUsername(trimmedEmail);
+        resetSignupFields();
         setPassword("");
         return;
       }
 
-      const userRole = response.user.role;
-
-      if (userRole === "student") {
-        navigate("/ogrenci", { replace: true });
-      } else if (userRole === "instructor") {
-        navigate("/ogretim-elemani", { replace: true });
-      } else if (userRole === "cashier") {
-        navigate("/kasiyer/siparisler", { replace: true });
-      } else if (userRole === "superadmin") {
-        navigate("/admin", { replace: true });
-      } else if (userRole === "subadmin") {
-        navigate("/admin/panel", { replace: true });
-      } else {
-        if (role === "student") {
-          navigate("/ogrenci", { replace: true });
-        } else if (role === "instructor") {
-          navigate("/ogretim-elemani", { replace: true });
-        } else if (role === "superadmin") {
-          navigate("/admin", { replace: true });
-        } else if (role === "subadmin") {
-          navigate("/admin/panel", { replace: true });
-        } else {
-          navigate("/kasiyer/siparisler", { replace: true });
-        }
-      }
+      redirectByRole(navigate, response.user.role);
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.message || "Kayıt yapılırken bir hata oluştu");
@@ -162,14 +151,10 @@ const LoginPage: React.FC = () => {
           {isSignup ? "Başkent Yaşam Kayıt" : "Başkent Yaşam Giriş"}
         </h1>
 
-        {/* Başarı Mesajı */}
         {success && showSuccess && (
-          <div 
+          <div
             className="bg-green-50 border-l-4 border-green-500 text-green-800 px-5 py-4 rounded-lg shadow-lg relative transition-all duration-300 ease-out"
-            style={{
-              animation: 'slideDown 0.3s ease-out',
-              minHeight: '80px'
-            }}
+            style={{ animation: "slideDown 0.3s ease-out", minHeight: "80px" }}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 flex-1">
@@ -195,14 +180,10 @@ const LoginPage: React.FC = () => {
           </div>
         )}
 
-        {/* Hata Mesajı */}
         {error && showError && (
-          <div 
+          <div
             className="bg-red-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-lg shadow-lg relative transition-all duration-300 ease-out"
-            style={{
-              animation: 'slideDown 0.3s ease-out',
-              minHeight: '80px'
-            }}
+            style={{ animation: "slideDown 0.3s ease-out", minHeight: "80px" }}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 flex-1">
@@ -228,25 +209,43 @@ const LoginPage: React.FC = () => {
           </div>
         )}
 
-        <input
-          type="text"
-          placeholder={isSignup ? "Kullanıcı adı" : "Kullanıcı adı"}
-          value={username}
-          onChange={(e) => {
-            const val = e.target.value;
-            setUsername(val);
-            // Akıllı rol seçimi (Sadece kayıt olurken)
-            if (isSignup && val.length > 0) {
-              // Rakamla başlıyorsa -> Öğrenci, yoksa -> Akademik
-              if (/^\d/.test(val)) {
-                setRole("student");
-              } else {
-                setRole("instructor");
-              }
-            }
-          }}
-          className="border rounded-lg px-4 py-2"
-        />
+        {isSignup ? (
+          <>
+            <input
+              type="text"
+              placeholder="Ad"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="border rounded-lg px-4 py-2"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Soyad"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="border rounded-lg px-4 py-2"
+              required
+            />
+            <input
+              type="email"
+              placeholder="E-posta"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="border rounded-lg px-4 py-2"
+              required
+            />
+          </>
+        ) : (
+          <input
+            type="text"
+            placeholder="Kullanıcı adı veya e-posta"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="border rounded-lg px-4 py-2"
+            required
+          />
+        )}
 
         <input
           type="password"
@@ -254,29 +253,22 @@ const LoginPage: React.FC = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="border rounded-lg px-4 py-2"
+          minLength={isSignup ? 8 : undefined}
+          maxLength={isSignup ? 15 : undefined}
+          required
         />
+        {isSignup && (
+          <p className="text-xs text-slate-500 -mt-2">{PASSWORD_POLICY_MESSAGE}</p>
+        )}
 
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as "student" | "instructor" | "cashier" | "superadmin" | "subadmin")}
-          className="border rounded-lg px-4 py-2"
-        >
-          <option value="student">Öğrenci</option>
-          <option value="instructor">Akademik Personel</option>
-          {!isSignup && <option value="cashier">Kasiyer</option>}
-          {!isSignup && <option value="superadmin">Sistem Yöneticisi</option>}
-          {!isSignup && <option value="subadmin">Alt Admin</option>}
-        </select>
         {!isSignup && (
           <div className="text-right mt-2">
-            <Link
-              to="/sifremi-unuttum"
-              className="text-sm text-blue-600 hover:underline"
-            >
+            <Link to="/sifremi-unuttum" className="text-sm text-blue-600 hover:underline">
               Şifremi Unuttum
             </Link>
           </div>
         )}
+
         <button
           type="submit"
           disabled={loading}
@@ -299,6 +291,7 @@ const LoginPage: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setIsSignup(false);
+                  resetSignupFields();
                   setError("");
                   setSuccess("");
                   setShowError(false);

@@ -56,6 +56,7 @@ const StudentInfo: React.FC<StudentInfoProps> = ({ apt }) => (
       </p>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600 mt-0.5">
         {apt.studentNo && <span>No: {apt.studentNo}</span>}
+        {apt.studentFaculty && <span>· {apt.studentFaculty}</span>}
         {apt.studentDepartment && <span>· {apt.studentDepartment}</span>}
         {apt.studentClassLevel && <span>· {apt.studentClassLevel}. sınıf</span>}
       </div>

@@ -39,6 +39,10 @@ public class User
     [Column("profile_department")]
     public string? ProfileDepartment { get; set; }
 
+    /// <summary>Öğrenci profilinde serbest metin fakülte alanı.</summary>
+    [Column("profile_faculty")]
+    public string? ProfileFaculty { get; set; }
+
     [MaxLength(50)]
     public string? RoomNumber { get; set; }
 

@@ -65,11 +65,6 @@ public class AdminManagementController : ControllerBase
     [HttpGet("assignable-scopes")]
     public async Task<ActionResult<List<AssignableScopeDto>>> GetAssignableScopes([FromQuery] AdminModuleType moduleType)
     {
-        if (moduleType is AdminModuleType.Library or AdminModuleType.Appointment)
-        {
-            return Ok(new List<AssignableScopeDto>());
-        }
-
         var scopes = await _directoryService.GetAssignableScopesAsync(moduleType);
         return Ok(scopes);
     }

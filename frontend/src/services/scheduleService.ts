@@ -6,19 +6,26 @@ export type ScheduleCell = {
   courseCode?: string;
 };
 
-/** Öğrenci tarafı: müsaitlik (dayOfWeek + startTime); courseCode isteğe bağlı. */
+/** Öğrenci tarafı: müsaitlik (dayOfWeek + startTime); courseName isteğe bağlı. */
 export interface ScheduleSlot {
   id?: number;
   dayOfWeek: number;
   startTime: string;
-  courseCode?: string;
+  courseName?: string;
   slot: string;
 }
 
+const mapScheduleCell = (item: Record<string, unknown>): ScheduleCell => ({
+  slot: String(item.slot ?? item.Slot ?? ""),
+  courseCode: String(
+    item.courseName ?? item.CourseName ?? item.courseCode ?? item.CourseCode ?? ""
+  ),
+});
+
 export const getMySchedule = async (): Promise<ScheduleCell[]> => {
   try {
-    const response = await apiClient.get<ScheduleCell[]>("/Schedule/my-schedule");
-    return response.data;
+    const response = await apiClient.get<Record<string, unknown>[]>("/Schedule/my-schedule");
+    return response.data.map(mapScheduleCell);
   } catch (error: any) {
     console.error("Ders programı yükleme hatası:", error);
     throw {
@@ -33,9 +40,7 @@ export const saveSchedule = async (slots: ScheduleCell[]): Promise<void> => {
     await apiClient.post("/Schedule/save", {
       slots: slots.map((cell) => ({
         slot: cell.slot,
-        courseCode: cell.courseCode?.trim()
-          ? cell.courseCode.trim()
-          : null,
+        courseName: cell.courseCode?.trim() ? cell.courseCode.trim() : null,
       })),
     });
   } catch (error: any) {

@@ -459,7 +459,7 @@ const CafeteriaOrderPage: React.FC = () => {
     }
   };
 
-  const getTimeOptions = () => {
+  const getTimeOptions = useMemo(() => {
     const options: string[] = [];
     for (let h = 9; h <= 17; h++) {
       for (const m of [0, 30]) {
@@ -469,8 +469,24 @@ const CafeteriaOrderPage: React.FC = () => {
         );
       }
     }
-    return options;
-  };
+
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const remainder = nowMinutes % 30;
+    const minMinutes =
+      remainder === 0 ? nowMinutes : nowMinutes + (30 - remainder);
+
+    return options.filter((time) => {
+      const [h, m] = time.split(":").map(Number);
+      return h * 60 + m >= minMinutes;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (selectedTime && !getTimeOptions.includes(selectedTime)) {
+      setSelectedTime("");
+    }
+  }, [getTimeOptions, selectedTime]);
 
   const densityMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -861,7 +877,7 @@ const CafeteriaOrderPage: React.FC = () => {
                         required
                       >
                         <option value="">Saat seçiniz</option>
-                        {getTimeOptions().map((time) => {
+                        {getTimeOptions.map((time) => {
                           const count = densityMap[time] || 0;
                           const label = getDensityLabel(count);
                           return (
@@ -879,7 +895,7 @@ const CafeteriaOrderPage: React.FC = () => {
                       </label>
                       <div className="bg-white rounded-xl border-2 border-slate-300 p-4 shadow-sm">
                         <div className="flex items-end gap-1.5 h-32">
-                          {getTimeOptions().map((time) => {
+                          {getTimeOptions.map((time) => {
                             const count = densityMap[time] || 0;
                             const info = getDensityLabel(count);
                             const heightPct = maxDensity > 0 ? Math.max(8, (count / maxDensity) * 100) : 8;
@@ -902,7 +918,7 @@ const CafeteriaOrderPage: React.FC = () => {
                           })}
                         </div>
                         <div className="flex gap-1.5 mt-2 border-t border-slate-200 pt-2">
-                          {getTimeOptions().map((time, i) => (
+                          {getTimeOptions.map((time, i) => (
                             <div key={time} className="flex-1 text-center">
                               <span className="text-[9px] font-bold text-slate-600 leading-none">
                                 {i % 2 === 0 ? time : ""}

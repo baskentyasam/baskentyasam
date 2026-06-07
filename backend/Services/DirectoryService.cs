@@ -60,20 +60,8 @@ public class DirectoryService : IDirectoryService
 
     public async Task<List<LibraryAreaListItemDto>> GetActiveLibraryAreasAsync()
     {
-        return await _context.LibraryAreas
-            .AsNoTracking()
-            .Where(l => l.IsActive)
-            .OrderBy(l => l.Name)
-            .Select(l => new LibraryAreaListItemDto
-            {
-                Id = l.Id,
-                Name = l.Name,
-                Location = l.Location,
-                Capacity = l.Capacity,
-                CurrentOccupancy = l.CurrentOccupancy,
-                AvailableSlots = Math.Max(l.Capacity - l.CurrentOccupancy, 0),
-            })
-            .ToListAsync();
+        // Kat tabanlı sisteme geçildi; bu metot geriye dönük uyumluluk için tutuluyor.
+        return new List<LibraryAreaListItemDto>();
     }
 
     public async Task<List<AssignableScopeDto>> GetAssignableScopesAsync(AdminModuleType moduleType)
@@ -104,6 +92,30 @@ public class DirectoryService : IDirectoryService
                     ScopeDisplayName = p.Name
                 })
                 .ToListAsync();
+        }
+
+        if (moduleType == AdminModuleType.Library)
+        {
+            return
+            [
+                new AssignableScopeDto
+                {
+                    ScopeKey = AdminAssignableScopes.LibraryScopeKey,
+                    ScopeDisplayName = AdminAssignableScopes.LibraryDisplayName,
+                },
+            ];
+        }
+
+        if (moduleType == AdminModuleType.Appointment)
+        {
+            return
+            [
+                new AssignableScopeDto
+                {
+                    ScopeKey = AdminAssignableScopes.AppointmentScopeKey,
+                    ScopeDisplayName = AdminAssignableScopes.AppointmentDisplayName,
+                },
+            ];
         }
 
         return new List<AssignableScopeDto>();

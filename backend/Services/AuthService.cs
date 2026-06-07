@@ -1,4 +1,5 @@
 using ApiProject.Data;
+using ApiProject.Helpers;
 using ApiProject.Models;
 using ApiProject.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,8 @@ public interface IAuthService
     Task<bool> VerifyEmailAsync(string token, int userId);
     string GenerateJwtToken(User user);
     /// <summary>E-posta kayıtlı değilse sessizce çıkar; enumeration riskini azaltmak için.</summary>
-    Task RequestPasswordResetAsync(string email);
+    /// <summary>Development + SMTP yoksa sıfırlama bağlantısını döner.</summary>
+    Task<string?> RequestPasswordResetAsync(string email);
     /// <summary>Geçerli token ile şifreyi günceller; token tek kullanımlıktır.</summary>
     Task<bool> ResetPasswordWithTokenAsync(string plainToken, string newPassword);
     Task<(bool Success, string? Error)> ChangePasswordAsync(int userId, string currentPassword, string newPassword);
@@ -89,30 +91,45 @@ public class AuthService : IAuthService
         {
             try
             {
-                // ExecuteSqlRaw yerine doğrudan bağlantı üzerinden scalar değer okuyalım
-                using var connection = _context.Database.GetDbConnection();
-                await connection.OpenAsync();
-                
-                using var command = connection.CreateCommand();
-                command.CommandText = "SELECT login_type::text FROM users WHERE id = @userId";
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = "@userId";
-                parameter.Value = user.Id;
-                command.Parameters.Add(parameter);
-                
-                var loginType = await command.ExecuteScalarAsync();
-                var loginTypeString = loginType?.ToString() ?? string.Empty;
-                
-                _logger.LogInformation($"Login attempt - UserId: {user.Id}, Email: {user.Email}, LoginType: '{loginTypeString}'");
-                
-                // login_type NULL veya boş ise doğrulanmamış demektir
-                if (string.IsNullOrWhiteSpace(loginTypeString))
+                var connection = _context.Database.GetDbConnection();
+                var shouldClose = connection.State != System.Data.ConnectionState.Open;
+                if (shouldClose)
                 {
-                    _logger.LogWarning($"Email doğrulanmamış kullanıcı giriş denemesi: {user.Email}");
-                    throw new UnauthorizedAccessException("Lütfen e-posta adresinizi doğrulayın. Kayıt sırasında gönderilen e-postadaki linke tıklayınız.");
+                    await connection.OpenAsync();
                 }
-                
-                _logger.LogInformation($"Email doğrulaması başarılı: {user.Email}");
+
+                try
+                {
+                    using var command = connection.CreateCommand();
+                    command.CommandText = "SELECT login_type::text FROM users WHERE id = @userId";
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = "@userId";
+                    parameter.Value = user.Id;
+                    command.Parameters.Add(parameter);
+
+                    var loginType = await command.ExecuteScalarAsync();
+                    var loginTypeString = loginType?.ToString() ?? string.Empty;
+
+                    _logger.LogInformation(
+                        "Login attempt - UserId: {UserId}, Email: {Email}, LoginType: '{LoginType}'",
+                        user.Id, user.Email, loginTypeString);
+
+                    if (string.IsNullOrWhiteSpace(loginTypeString))
+                    {
+                        _logger.LogWarning("Email doğrulanmamış kullanıcı giriş denemesi: {Email}", user.Email);
+                        throw new UnauthorizedAccessException(
+                            "Lütfen e-posta adresinizi doğrulayın. Kayıt sırasında gönderilen e-postadaki linke tıklayınız.");
+                    }
+
+                    _logger.LogInformation("Email doğrulaması başarılı: {Email}", user.Email);
+                }
+                finally
+                {
+                    if (shouldClose && connection.State == System.Data.ConnectionState.Open)
+                    {
+                        await connection.CloseAsync();
+                    }
+                }
             }
             catch (UnauthorizedAccessException)
             {
@@ -126,21 +143,13 @@ public class AuthService : IAuthService
             }
         }
 
-        // AppDbContext.cs'de role_id değeri otomatik olarak enum'a çevriliyor (role_id - 1)
-        // Bu yüzden user.Role zaten doğru enum değerini içeriyor
-        var userRoleFromDb = user.Role;
-
-        // Rol kontrolü: Öğrenci akademik (Teacher) rolü ile giriş yapamamalı
-        if (userRoleFromDb == UserRole.Student && loginDto.Role == UserRole.Teacher)
+        var now = DateTime.UtcNow;
+        if (user.FirstLoginAt == null)
         {
-            throw new UnauthorizedAccessException("Öğrenci kullanıcılar akademik personel rolü ile giriş yapamaz.");
+            user.FirstLoginAt = now;
         }
-
-        // Kullanıcının gerçek rolü ile giriş yapmaya çalıştığı rol eşleşmeli
-        if (userRoleFromDb != loginDto.Role)
-        {
-            throw new UnauthorizedAccessException("Seçilen rol ile kullanıcı rolü eşleşmiyor.");
-        }
+        user.LastLoginAt = now;
+        await _context.SaveChangesAsync();
 
         var token = GenerateJwtToken(user);
 
@@ -155,28 +164,33 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
     {
+        var (passwordValid, passwordError) = PasswordPolicy.Validate(registerDto.Password);
+        if (!passwordValid)
+        {
+            throw new InvalidOperationException(passwordError);
+        }
+
         if (registerDto.Role is not UserRole.Student and not UserRole.Teacher)
         {
             throw new InvalidOperationException("Bu kayıt tipi desteklenmiyor.");
         }
 
-        // Kullanıcı adı kontrolü (Name ile kontrol)
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.Name.ToLower().Trim() == registerDto.Username.ToLower().Trim());
-
-        if (existingUser != null)
-            throw new InvalidOperationException("Bu kullanıcı adı zaten kullanılıyor.");
-
-        // Email kontrolü
-        string email;
-        if (!string.IsNullOrEmpty(registerDto.Email))
+        // E-posta benzersizliği
+        var email = registerDto.Email?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(email))
         {
-            email = registerDto.Email.Trim();
+            throw new InvalidOperationException("E-posta adresi gereklidir.");
         }
-        else
+
+        var fullName = $"{registerDto.FirstName?.Trim()} {registerDto.LastName?.Trim()}".Trim();
+        if (string.IsNullOrWhiteSpace(fullName) && !string.IsNullOrWhiteSpace(registerDto.Username))
         {
-            // Email gelmediyse kullanıcı adından oluştur (Fallback)
-            email = $"{registerDto.Username.ToLower().Trim().Replace(" ", ".")}@baskent.edu.tr";
+            fullName = registerDto.Username.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            throw new InvalidOperationException("Ad soyad gereklidir.");
         }
         
         // Email unique kontrolü
@@ -196,7 +210,7 @@ public class AuthService : IAuthService
         // Bu yüzden enum değerini direkt kullanıyoruz, AppDbContext otomatik olarak +1 yapacak
         var user = new User
         {
-            Name = registerDto.Username,
+            Name = fullName,
             Email = email,
             PasswordHash = passwordHash,
             Role = registerDto.Role, // Enum değerini direkt kullan (Student=0, Teacher=1, vb.)
@@ -375,11 +389,11 @@ public class AuthService : IAuthService
         return true;
     }
 
-    public async Task RequestPasswordResetAsync(string email)
+    public async Task<string?> RequestPasswordResetAsync(string email)
     {
         var normalized = email?.Trim().ToLowerInvariant() ?? string.Empty;
         if (string.IsNullOrEmpty(normalized))
-            return;
+            return null;
 
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == normalized);
@@ -387,7 +401,7 @@ public class AuthService : IAuthService
         if (user == null)
         {
             _logger.LogInformation("Şifre sıfırlama: e-posta sistemde yok (genel yanıt verilecek): {Email}", normalized);
-            return;
+            return null;
         }
 
         var expiryMinutes = _configuration.GetValue("PasswordReset:ExpiryMinutes", 20);
@@ -420,7 +434,8 @@ public class AuthService : IAuthService
 
         try
         {
-            await _emailService.SendPasswordResetEmailAsync(user.Email, user.Name, resetLink, expiryMinutes);
+            var sent = await _emailService.SendPasswordResetEmailAsync(user.Email, user.Name, resetLink, expiryMinutes);
+            return sent ? null : resetLink;
         }
         catch (Exception ex)
         {
@@ -435,6 +450,12 @@ public class AuthService : IAuthService
     {
         if (string.IsNullOrWhiteSpace(plainToken) || string.IsNullOrWhiteSpace(newPassword))
             return false;
+
+        var (passwordValid, passwordError) = PasswordPolicy.Validate(newPassword);
+        if (!passwordValid)
+        {
+            throw new InvalidOperationException(passwordError);
+        }
 
         var tokenHash = HashPasswordResetToken(plainToken.Trim());
         var row = await _context.PasswordResetTokens
@@ -464,9 +485,10 @@ public class AuthService : IAuthService
             return (false, "Mevcut ve yeni şifre gereklidir.");
         }
 
-        if (newPassword.Length < 6)
+        var (passwordValid, passwordError) = PasswordPolicy.Validate(newPassword);
+        if (!passwordValid)
         {
-            return (false, "Yeni şifre en az 6 karakter olmalıdır.");
+            return (false, passwordError);
         }
 
         if (currentPassword == newPassword)

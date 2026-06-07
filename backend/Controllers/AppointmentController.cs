@@ -417,8 +417,17 @@ public class AppointmentController : ControllerBase
             StudentId = appointment.StudentId,
             StudentName = appointment.Student?.Name ?? "Bilinmiyor",
             StudentNo = appointment.Student?.StudentNo,
+            StudentFaculty = appointment.Student?.ProfileFaculty
+                ?? appointment.Student?.Department?.Faculty?.Name,
+            StudentDepartment = appointment.Student?.ProfileDepartment
+                ?? appointment.Student?.Department?.Name,
+            StudentClassLevel = appointment.Student?.ClassLevel,
+            StudentProfileImage = appointment.Student?.ProfileImage,
             TeacherId = appointment.TeacherId,
             TeacherName = appointment.Teacher?.Name ?? "Bilinmiyor",
+            TeacherDepartment = appointment.Teacher?.ProfileDepartment
+                ?? appointment.Teacher?.Department?.Name,
+            TeacherRoomNumber = appointment.Teacher?.RoomNumber,
             Date = appointment.Date,
             Time = appointment.Time,
             Subject = appointment.Subject,

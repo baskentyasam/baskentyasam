@@ -11,7 +11,7 @@ public static class UserRoleDisplayHelper
             UserRole.Student => "Öğrenci",
             UserRole.Teacher => "Öğretim Elemanı",
             UserRole.Staff => "Kasiyer / Personel",
-            UserRole.SuperAdmin => "Sistem Yöneticisi",
+            UserRole.SuperAdmin => "Admin Sistem Yöneticisi",
             UserRole.SubAdmin => "Alt Admin",
             UserRole.Admin => "Legacy / Pasif Eski Rol",
             _ => role.ToString(),

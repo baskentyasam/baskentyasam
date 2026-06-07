@@ -6,16 +6,19 @@ const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [devResetLink, setDevResetLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setDevResetLink(null);
     setLoading(true);
     try {
-      const msg = await requestForgotPassword(email.trim());
-      setMessage(msg);
+      const result = await requestForgotPassword(email.trim());
+      setMessage(result.message);
+      setDevResetLink(result.devResetLink ?? null);
     } catch (err) {
       const api = err as ApiError;
       setError(api.message || "İstek gönderilemedi.");
@@ -33,8 +36,15 @@ const ForgotPasswordPage: React.FC = () => {
         </p>
 
         {message && (
-          <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-lg">
-            {message}
+          <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-lg space-y-2">
+            <p>{message}</p>
+            {devResetLink && (
+              <p className="break-all">
+                <a href={devResetLink} className="text-[#d71920] underline font-medium">
+                  Şifre sıfırlama bağlantısı (development)
+                </a>
+              </p>
+            )}
           </div>
         )}
         {error && (

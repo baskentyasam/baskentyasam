@@ -32,11 +32,6 @@ public class SubAdminManagementService : ISubAdminManagementService
             throw new InvalidOperationException("Bu e-posta adresi zaten kullanılıyor.");
         }
 
-        if (dto.ModuleType is AdminModuleType.Library or AdminModuleType.Appointment)
-        {
-            throw new InvalidOperationException("Bu modül tipi bu aşamada aktif değil.");
-        }
-
         if (dto.ModuleType == AdminModuleType.Cafeteria)
         {
             var exists = int.TryParse(dto.ScopeKey, out var cafeteriaId) &&
@@ -55,6 +50,18 @@ public class SubAdminManagementService : ISubAdminManagementService
             {
                 throw new InvalidOperationException("Seçilen otopark scope'u geçerli değil.");
             }
+        }
+
+        if (dto.ModuleType == AdminModuleType.Library &&
+            !dto.ScopeKey.Trim().Equals(AdminAssignableScopes.LibraryScopeKey, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Geçersiz kütüphane kapsamı.");
+        }
+
+        if (dto.ModuleType == AdminModuleType.Appointment &&
+            !dto.ScopeKey.Trim().Equals(AdminAssignableScopes.AppointmentScopeKey, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Geçersiz randevu kapsamı.");
         }
 
         var user = new User
@@ -94,6 +101,14 @@ public class SubAdminManagementService : ISubAdminManagementService
                 .Where(p => p.Id == parkingIdForName)
                 .Select(p => p.Name)
                 .FirstAsync();
+        }
+        else if (dto.ModuleType == AdminModuleType.Library)
+        {
+            resolvedScopeDisplayName = AdminAssignableScopes.LibraryDisplayName;
+        }
+        else if (dto.ModuleType == AdminModuleType.Appointment)
+        {
+            resolvedScopeDisplayName = AdminAssignableScopes.AppointmentDisplayName;
         }
 
         var assignmentToCreate = new AdminAssignment

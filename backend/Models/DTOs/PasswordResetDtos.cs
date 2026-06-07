@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ApiProject.Helpers;
 
 namespace ApiProject.Models.DTOs;
 
@@ -15,7 +16,9 @@ public class ResetPasswordRequestDto
     public string Token { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Yeni şifre gereklidir.")]
-    [MinLength(6, ErrorMessage = "Şifre en az 6 karakter olmalıdır.")]
+    [MinLength(PasswordPolicy.MinLength, ErrorMessage = PasswordPolicy.ErrorMessage)]
+    [MaxLength(PasswordPolicy.MaxLength, ErrorMessage = PasswordPolicy.ErrorMessage)]
+    [PasswordPolicy]
     public string NewPassword { get; set; } = string.Empty;
 }
 
@@ -25,6 +28,8 @@ public class ChangePasswordDto
     public string CurrentPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Yeni şifre gereklidir.")]
-    [MinLength(6, ErrorMessage = "Şifre en az 6 karakter olmalıdır.")]
+    [MinLength(PasswordPolicy.MinLength, ErrorMessage = PasswordPolicy.ErrorMessage)]
+    [MaxLength(PasswordPolicy.MaxLength, ErrorMessage = PasswordPolicy.ErrorMessage)]
+    [PasswordPolicy]
     public string NewPassword { get; set; } = string.Empty;
 }

@@ -78,6 +78,25 @@ export interface ParkingLot {
   createdAt: string;
 }
 
+export interface LibraryFloorAdmin {
+  id: number;
+  code: string;
+  name: string;
+  maxCapacity: number;
+  isOpen: boolean;
+  sortOrder: number;
+}
+
+export interface LibraryAdminOverview {
+  currentOccupancy: number;
+  openCapacity: number;
+  availableSlots: number;
+  occupancyRate: number;
+  lastUpdatedAt?: string | null;
+  floors: LibraryFloorAdmin[];
+}
+
+/** @deprecated Eski alan tabanlı model */
 export interface LibraryArea {
   id: number;
   name: string;
@@ -187,33 +206,25 @@ export const updateParkingMetrics = async (id: number, payload: { capacity: numb
   return res.data;
 };
 
-export const getAdminLibraryAreas = async () => {
-  const res = await apiClient.get<LibraryArea[]>("/admin/library");
+export const getLibraryAdminOverview = async () => {
+  const res = await apiClient.get<LibraryAdminOverview>("/admin/library/overview");
   return res.data;
 };
 
-export const createLibraryArea = async (payload: Partial<LibraryArea>) => {
-  const res = await apiClient.post<LibraryArea>("/admin/library", payload);
+export const updateLibraryOpenFloors = async (openFloorCodes: string[]) => {
+  const res = await apiClient.put<LibraryAdminOverview>("/admin/library/floors/open", { openFloorCodes });
   return res.data;
 };
 
-export const updateLibraryArea = async (id: number, payload: Partial<LibraryArea>) => {
-  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}`, payload);
+export const updateLibraryCapacities = async (
+  floors: { code: string; maxCapacity: number }[],
+) => {
+  const res = await apiClient.put<LibraryAdminOverview>("/admin/library/floors/capacities", { floors });
   return res.data;
 };
 
-export const updateLibraryMetrics = async (id: number, payload: { capacity: number; currentOccupancy: number }) => {
-  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}/metrics`, payload);
-  return res.data;
-};
-
-export const activateLibraryArea = async (id: number) => {
-  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}/activate`);
-  return res.data;
-};
-
-export const deactivateLibraryArea = async (id: number) => {
-  const res = await apiClient.put<LibraryArea>(`/admin/library/${id}/deactivate`);
+export const updateLibraryOccupancy = async (currentOccupancy: number) => {
+  const res = await apiClient.put<LibraryAdminOverview>("/admin/library/occupancy", { currentOccupancy });
   return res.data;
 };
 

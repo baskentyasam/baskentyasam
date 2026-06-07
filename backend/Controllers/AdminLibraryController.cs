@@ -1,51 +1,53 @@
-using ApiProject.Data;
+using System.Security.Claims;
 using ApiProject.Models;
 using ApiProject.Models.DTOs;
+using ApiProject.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace ApiProject.Controllers;
 
 [ApiController]
 [Route("api/admin/library")]
-[Authorize(Roles = "SuperAdmin")]
+[Authorize(Roles = "SuperAdmin,SubAdmin")]
 public class AdminLibraryController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly ILibraryManagementService _libraryService;
+    private readonly IAdminAuthorizationService _adminAuthorizationService;
 
-    public AdminLibraryController(AppDbContext context)
+    public AdminLibraryController(
+        ILibraryManagementService libraryService,
+        IAdminAuthorizationService adminAuthorizationService)
     {
-        _context = context;
+        _libraryService = libraryService;
+        _adminAuthorizationService = adminAuthorizationService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<List<LibraryArea>>> GetLibraryAreas()
+    [HttpGet("overview")]
+    public async Task<ActionResult<LibraryAdminOverviewDto>> GetOverview()
     {
-        return Ok(await _context.LibraryAreas.OrderBy(l => l.Name).ToListAsync());
+        var denied = await EnsureLibraryAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
+        return Ok(await _libraryService.GetOverviewAsync());
     }
 
-    [HttpPost]
-    public async Task<ActionResult<LibraryArea>> Create([FromBody] UpsertLibraryAreaDto dto)
+    [HttpPut("floors/open")]
+    public async Task<ActionResult<LibraryAdminOverviewDto>> UpdateOpenFloors(
+        [FromBody] UpdateLibraryOpenFloorsDto dto)
     {
+        var denied = await EnsureLibraryAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
-            ValidateUpsertDto(dto);
-            await EnsureUniqueActiveNameAsync(dto.Name.Trim());
-
-            var area = new LibraryArea
-            {
-                Name = dto.Name.Trim(),
-                Location = dto.Location?.Trim(),
-                Capacity = dto.Capacity,
-                CurrentOccupancy = dto.CurrentOccupancy,
-                IsActive = dto.IsActive,
-                CreatedAt = DateTime.UtcNow,
-            };
-
-            _context.LibraryAreas.Add(area);
-            await _context.SaveChangesAsync();
-            return Ok(area);
+            return Ok(await _libraryService.UpdateOpenFloorsAsync(dto.OpenFloorCodes));
         }
         catch (InvalidOperationException ex)
         {
@@ -53,31 +55,24 @@ public class AdminLibraryController : ControllerBase
         }
     }
 
-    [HttpPut("{libraryAreaId:int}")]
-    public async Task<ActionResult<LibraryArea>> Update(int libraryAreaId, [FromBody] UpsertLibraryAreaDto dto)
+    [HttpPut("floors/capacities")]
+    public async Task<ActionResult<LibraryAdminOverviewDto>> UpdateCapacities(
+        [FromBody] UpdateLibraryCapacitiesDto dto)
     {
+        var denied = await EnsureLibraryAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
-            var area = await _context.LibraryAreas.FindAsync(libraryAreaId);
-            if (area == null)
+            if (dto.Floors == null || dto.Floors.Count == 0)
             {
-                return NotFound(new { message = "Kütüphane alanı bulunamadı." });
+                return BadRequest(new { message = "En az bir kat kapasitesi gönderilmelidir." });
             }
 
-            ValidateUpsertDto(dto);
-            if (dto.IsActive)
-            {
-                await EnsureUniqueActiveNameAsync(dto.Name.Trim(), libraryAreaId);
-            }
-
-            area.Name = dto.Name.Trim();
-            area.Location = dto.Location?.Trim();
-            area.Capacity = dto.Capacity;
-            area.CurrentOccupancy = dto.CurrentOccupancy;
-            area.IsActive = dto.IsActive;
-
-            await _context.SaveChangesAsync();
-            return Ok(area);
+            return Ok(await _libraryService.UpdateCapacitiesAsync(dto.Floors));
         }
         catch (InvalidOperationException ex)
         {
@@ -85,24 +80,24 @@ public class AdminLibraryController : ControllerBase
         }
     }
 
-    [HttpPut("{libraryAreaId:int}/metrics")]
-    public async Task<ActionResult<LibraryArea>> UpdateMetrics(int libraryAreaId, [FromBody] UpdateLibraryMetricsDto dto)
+    [HttpPut("occupancy")]
+    public async Task<ActionResult<LibraryAdminOverviewDto>> UpdateOccupancy(
+        [FromBody] UpdateLibraryOccupancyDto dto)
     {
+        var denied = await EnsureLibraryAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
         try
         {
-            var area = await _context.LibraryAreas.FindAsync(libraryAreaId);
-            if (area == null)
+            if (dto.CurrentOccupancy < 0)
             {
-                return NotFound(new { message = "Kütüphane alanı bulunamadı." });
+                return BadRequest(new { message = "Kişi sayısı 0 veya daha büyük olmalıdır." });
             }
 
-            var capacity = Math.Max(dto.Capacity, 0);
-            var occupancy = Math.Clamp(dto.CurrentOccupancy, 0, capacity);
-            area.Capacity = capacity;
-            area.CurrentOccupancy = occupancy;
-
-            await _context.SaveChangesAsync();
-            return Ok(area);
+            return Ok(await _libraryService.UpdateOccupancyAsync(dto.CurrentOccupancy));
         }
         catch (InvalidOperationException ex)
         {
@@ -110,76 +105,36 @@ public class AdminLibraryController : ControllerBase
         }
     }
 
-    [HttpPut("{libraryAreaId:int}/activate")]
-    public async Task<ActionResult<LibraryArea>> Activate(int libraryAreaId)
+    private async Task<ActionResult?> EnsureLibraryAccessAsync()
     {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        if (await _adminAuthorizationService.IsSuperAdminAsync(userId.Value))
+        {
+            return null;
+        }
+
         try
         {
-            var area = await _context.LibraryAreas.FindAsync(libraryAreaId);
-            if (area == null)
-            {
-                return NotFound(new { message = "Kütüphane alanı bulunamadı." });
-            }
-
-            await EnsureUniqueActiveNameAsync(area.Name, libraryAreaId);
-            area.IsActive = true;
-            await _context.SaveChangesAsync();
-            return Ok(area);
+            await _adminAuthorizationService.EnsureModuleScopeAccessAsync(
+                userId.Value,
+                AdminModuleType.Library,
+                AdminAssignableScopes.LibraryScopeKey);
+            return null;
         }
-        catch (InvalidOperationException ex)
+        catch (UnauthorizedAccessException)
         {
-            return BadRequest(new { message = ex.Message });
+            return Forbid();
         }
     }
 
-    [HttpPut("{libraryAreaId:int}/deactivate")]
-    public async Task<ActionResult<LibraryArea>> Deactivate(int libraryAreaId)
+    private int? GetCurrentUserId()
     {
-        var area = await _context.LibraryAreas.FindAsync(libraryAreaId);
-        if (area == null)
-        {
-            return NotFound(new { message = "Kütüphane alanı bulunamadı." });
-        }
-
-        area.IsActive = false;
-        await _context.SaveChangesAsync();
-        return Ok(area);
-    }
-
-    private static void ValidateUpsertDto(UpsertLibraryAreaDto dto)
-    {
-        if (string.IsNullOrWhiteSpace(dto.Name))
-        {
-            throw new InvalidOperationException("Alan adı boş olamaz.");
-        }
-
-        if (dto.Capacity < 0)
-        {
-            throw new InvalidOperationException("Kapasite 0 veya daha büyük olmalıdır.");
-        }
-
-        if (dto.CurrentOccupancy < 0)
-        {
-            throw new InvalidOperationException("Mevcut doluluk 0 veya daha büyük olmalıdır.");
-        }
-
-        if (dto.CurrentOccupancy > dto.Capacity)
-        {
-            throw new InvalidOperationException("Mevcut doluluk kapasiteden büyük olamaz.");
-        }
-    }
-
-    private async Task EnsureUniqueActiveNameAsync(string name, int? excludeId = null)
-    {
-        var normalized = name.ToLower();
-        var exists = await _context.LibraryAreas.AnyAsync(l =>
-            l.IsActive &&
-            l.Name.ToLower() == normalized &&
-            (!excludeId.HasValue || l.Id != excludeId.Value));
-
-        if (exists)
-        {
-            throw new InvalidOperationException("Bu isimde aktif bir kütüphane alanı zaten var.");
-        }
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }

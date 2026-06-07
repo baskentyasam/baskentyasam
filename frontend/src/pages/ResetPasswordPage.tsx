@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { resetPasswordWithToken, ApiError } from "../services/authService";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "../utils/passwordPolicy";
 
 const ResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -20,8 +21,9 @@ const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     if (!tokenFromUrl) return;
-    if (password.length < 6) {
-      setError("Şifre en az 6 karakter olmalıdır.");
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (password !== confirm) {
@@ -69,17 +71,20 @@ const ResetPasswordPage: React.FC = () => {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
+              maxLength={15}
               autoComplete="new-password"
-              placeholder="Yeni şifre (en az 6 karakter)"
+              placeholder="Yeni şifre"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="border rounded-lg px-4 py-2"
             />
+            <p className="text-xs text-slate-500 -mt-2">{PASSWORD_POLICY_MESSAGE}</p>
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
+              maxLength={15}
               autoComplete="new-password"
               placeholder="Yeni şifre (tekrar)"
               value={confirm}

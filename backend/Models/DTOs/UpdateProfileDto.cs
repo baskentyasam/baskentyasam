@@ -4,7 +4,13 @@ namespace ApiProject.Models.DTOs;
 
 public class UpdateProfileDto
 {
+    [MaxLength(200)]
+    public string? Name { get; set; }
+
     public string? ProfileImage { get; set; }
+
+    [MaxLength(200)]
+    public string? Faculty { get; set; }
 
     [MaxLength(200)]
     public string? Department { get; set; }

@@ -178,6 +178,7 @@ try
     builder.Services.AddScoped<IAdminAuthorizationService, AdminAuthorizationService>();
     builder.Services.AddScoped<ISubAdminManagementService, SubAdminManagementService>();
     builder.Services.AddScoped<IDirectoryService, DirectoryService>();
+    builder.Services.AddScoped<ILibraryManagementService, LibraryManagementService>();
     builder.Services.AddScoped<IUserManagementService, UserManagementService>();
     builder.Services.AddScoped<IAdminAppointmentManagementService, AdminAppointmentManagementService>();
     builder.Services.AddScoped<ScheduleService>();

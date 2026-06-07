@@ -420,7 +420,7 @@ const CashierOrdersPage: React.FC = () => {
                         {o.customerEmail && (
                           <p className="text-slate-600 text-xs mt-0.5">{o.customerEmail}</p>
                         )}
-                        {o.studentNo && (
+                        {o.userType === "Student" && o.studentNo && (
                           <p className="text-slate-600 text-xs">Öğrenci no: {o.studentNo}</p>
                         )}
                       </div>

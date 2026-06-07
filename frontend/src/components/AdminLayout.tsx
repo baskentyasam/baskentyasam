@@ -49,10 +49,10 @@ const AdminLayout: React.FC<Props> = ({ title, children, subtitle }) => {
       <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-[#1a1c2e] text-white">
         <div className="px-6 pt-7 pb-5">
           <div className="text-sm font-bold tracking-[0.12em]">
-            {isSuperAdmin ? "SÜPER ADMIN" : "ALT ADMIN"}
+            {isSuperAdmin ? "ADMIN" : "ALT ADMIN"}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            {isSuperAdmin ? "Sistem Yöneticisi" : getRoleDisplayName(user?.role)}
+            {isSuperAdmin ? "Admin Sistem Yöneticisi" : getRoleDisplayName(user?.role)}
           </div>
         </div>
 

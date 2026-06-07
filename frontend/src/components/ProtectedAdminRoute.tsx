@@ -6,7 +6,7 @@ import { getMyAdminAssignment } from "../services/adminService";
 interface Props {
   children: React.ReactNode;
   requireSuperAdmin?: boolean;
-  scopedModule?: "cafeteria" | "parking";
+  scopedModule?: "cafeteria" | "parking" | "library" | "appointment";
 }
 
 const ProtectedAdminRoute: React.FC<Props> = ({
@@ -49,6 +49,22 @@ const ProtectedAdminRoute: React.FC<Props> = ({
             scopedModule === "parking" &&
             assignment.moduleType === "Parking" &&
             assignment.scopeKey === params.parkingLotId
+          ) {
+            setAllowed(true);
+            return;
+          }
+          if (
+            scopedModule === "library" &&
+            assignment.moduleType === "Library" &&
+            assignment.scopeKey === "library"
+          ) {
+            setAllowed(true);
+            return;
+          }
+          if (
+            scopedModule === "appointment" &&
+            assignment.moduleType === "Appointment" &&
+            assignment.scopeKey === "appointment"
           ) {
             setAllowed(true);
             return;

@@ -31,11 +31,11 @@ export interface ApiError {
 }
 
 export interface RegisterRequest {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   role: 'student' | 'instructor';
-  studentNo?: string | null;
 }
 
 // Login işlemi
@@ -47,16 +47,7 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
       password: credentials.password,
     };
 
-    // Role'ü backend formatına çevir
-    if (credentials.role) {
-      if (credentials.role === "instructor") requestBody.role = "Teacher";
-      else if (credentials.role === "cashier") requestBody.role = "Staff";
-      else if (credentials.role === "superadmin") requestBody.role = "SuperAdmin";
-      else if (credentials.role === "subadmin") requestBody.role = "SubAdmin";
-      else requestBody.role = "Student";
-    }
-
-    // Backend endpoint'i /Auth/login (büyük harf ile)
+    // Rol backend'de kullanıcı kaydından belirlenir; istemci göndermez.
     const response = await apiClient.post<BackendLoginResponse>('/Auth/login', requestBody);
 
     // Backend'den gelen response'u frontend formatına dönüştür
@@ -77,7 +68,7 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
     } else if (roleLower === "admin") {
       throw {
         message:
-          "Legacy Admin hesabı devre dışıdır. Lütfen Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
+          "Legacy Admin hesabı devre dışıdır. Lütfen Admin Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
         status: 403,
       } as ApiError;
     } else {
@@ -134,11 +125,11 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
 
   try {
     const requestBody = {
-      name: payload.name,
-      email: payload.email,
+      firstName: payload.firstName.trim(),
+      lastName: payload.lastName.trim(),
+      email: payload.email.trim(),
       password: payload.password,
-      role: payload.role === 'instructor' ? 'Teacher' : 'Student', // Backend UserRole enum uses Teacher/Student
-      studentNo: payload.studentNo || null,
+      role: payload.role === 'instructor' ? 'Teacher' : 'Student',
     };
 
     const response = await apiClient.post<BackendLoginResponse>('/Auth/register', requestBody);
@@ -159,7 +150,7 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
     } else if (roleLower === "admin") {
       throw {
         message:
-          "Legacy Admin hesabı devre dışıdır. Lütfen Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
+          "Legacy Admin hesabı devre dışıdır. Lütfen Admin Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
         status: 403,
       } as ApiError;
     } else {
@@ -224,7 +215,7 @@ export const getRoleDisplayName = (
   role?: "student" | "instructor" | "cashier" | "superadmin" | "subadmin"
 ): string => {
   if (!role) return "Kullanıcı";
-  if (role === "superadmin") return "Sistem Yöneticisi";
+  if (role === "superadmin") return "Admin Sistem Yöneticisi";
   if (role === "subadmin") return "Alt Admin";
   if (role === "cashier") return "Kasiyer";
   if (role === "instructor") return "Akademik Personel";
@@ -237,10 +228,15 @@ export const isAuthenticated = (): boolean => {
 };
 
 /** Şifre sıfırlama talebi (e-posta enumeration azaltılmış genel mesaj döner). */
-export const requestForgotPassword = async (email: string): Promise<string> => {
+export type ForgotPasswordResponse = {
+  message: string;
+  devResetLink?: string;
+};
+
+export const requestForgotPassword = async (email: string): Promise<ForgotPasswordResponse> => {
   try {
-    const res = await apiClient.post<{ message: string }>('/Auth/forgot-password', { email });
-    return res.data.message;
+    const res = await apiClient.post<ForgotPasswordResponse>('/Auth/forgot-password', { email });
+    return res.data;
   } catch (error: any) {
     const msg =
       error.response?.data?.message ||
@@ -274,6 +270,7 @@ export interface MyProfile {
   role: string;
   studentNo?: string | null;
   profileImage?: string | null;
+  faculty?: string | null;
   department?: string | null;
   roomNumber?: string | null;
   phoneNumber?: string | null;
@@ -284,7 +281,9 @@ export interface MyProfile {
 }
 
 export interface UpdateProfilePayload {
+  name?: string | null;
   profileImage?: string | null;
+  faculty?: string | null;
   department?: string | null;
   roomNumber?: string | null;
   phoneNumber?: string | null;

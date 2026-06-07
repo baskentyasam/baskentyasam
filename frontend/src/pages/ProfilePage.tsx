@@ -8,6 +8,7 @@ import {
   logout,
   MyProfile,
 } from "../services/authService";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "../utils/passwordPolicy";
 
 const getInitials = (name?: string): string => {
   if (!name) return "?";
@@ -62,6 +63,8 @@ const ProfilePage: React.FC = () => {
 
   // Form state
   const [department, setDepartment] = useState("");
+  const [faculty, setFaculty] = useState("");
+  const [fullName, setFullName] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [classLevel, setClassLevel] = useState("");
@@ -91,6 +94,8 @@ const ProfilePage: React.FC = () => {
   }, [localUser?.role]);
 
   const syncFormFromProfile = useCallback((p: MyProfile) => {
+    setFullName(p.name || "");
+    setFaculty(p.faculty || "");
     setDepartment(p.department || "");
     setRoomNumber(p.roomNumber || "");
     setPhoneNumber(p.phoneNumber || "");
@@ -208,11 +213,13 @@ const ProfilePage: React.FC = () => {
     setSavingProfile(true);
     try {
       const updated = await updateMyProfile({
+        name: fullName.trim(),
+        faculty: faculty.trim(),
         department: department.trim(),
         roomNumber: isInstructor ? roomNumber.trim() : "",
         phoneNumber: phoneNumber.trim(),
         classLevel: isStudent ? classLevel.trim() : "",
-        studentNo: studentNo.trim(),
+        studentNo: isStudent ? studentNo.trim() : "",
         courses: isInstructor ? courses.trim() : "",
       });
       setProfile(updated);
@@ -234,8 +241,9 @@ const ProfilePage: React.FC = () => {
       setPasswordError("Tüm alanları doldurun.");
       return;
     }
-    if (newPassword.length < 6) {
-      setPasswordError("Yeni şifre en az 6 karakter olmalıdır.");
+    const policyError = validatePassword(newPassword);
+    if (policyError) {
+      setPasswordError(policyError);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -372,7 +380,7 @@ const ProfilePage: React.FC = () => {
                   <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-[#d71920] border border-red-100">
                     {roleLabel(profile?.role)}
                   </span>
-                  {profile?.studentNo && (
+                  {isStudent && profile?.studentNo && (
                     <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                       No: {profile.studentNo}
                     </span>
@@ -405,7 +413,6 @@ const ProfilePage: React.FC = () => {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-              <InfoBox label="Ad Soyad" value={profile?.name} />
               <InfoBox label="E-posta" value={profile?.email} breakAll />
               <InfoBox label="Rol" value={roleLabel(profile?.role)} />
             </div>
@@ -413,13 +420,29 @@ const ProfilePage: React.FC = () => {
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field
-                  label={isStudent ? "Öğrenci Numarası" : "Personel Numarası"}
-                  value={studentNo}
-                  onChange={setStudentNo}
-                  placeholder={isStudent ? "Örn: 22192103" : "Örn: 1234"}
+                  label="Ad Soyad"
+                  value={fullName}
+                  onChange={setFullName}
+                  placeholder="Adınız ve soyadınız"
                 />
+                {isStudent && (
+                  <Field
+                    label="Öğrenci Numarası"
+                    value={studentNo}
+                    onChange={setStudentNo}
+                    placeholder="Örn: 22192103"
+                  />
+                )}
+                {(isStudent || isInstructor) && (
+                  <Field
+                    label="Fakülte"
+                    value={faculty}
+                    onChange={setFaculty}
+                    placeholder="Örn: Mühendislik Fakültesi"
+                  />
+                )}
                 <Field
-                  label="Bölüm"
+                  label={isStudent ? "Bölüm" : "Bölüm / Birim"}
                   value={department}
                   onChange={setDepartment}
                   placeholder="Örn: Bilgisayar Mühendisliği"
@@ -560,10 +583,11 @@ const ProfilePage: React.FC = () => {
                     className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                     autoComplete="new-password"
                     required
-                    minLength={6}
+                    minLength={8}
+                    maxLength={15}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    En az 6 karakter olmalıdır.
+                    {PASSWORD_POLICY_MESSAGE}
                   </p>
                 </div>
 
@@ -578,7 +602,8 @@ const ProfilePage: React.FC = () => {
                     className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                     autoComplete="new-password"
                     required
-                    minLength={6}
+                    minLength={8}
+                    maxLength={15}
                   />
                 </div>
 

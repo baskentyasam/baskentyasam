@@ -118,6 +118,48 @@ public class AdminUsersController : ControllerBase
         }
     }
 
+    [HttpPut("{id:int}/role")]
+    public async Task<ActionResult<AdminUserDetailDto>> UpdateUserRole(int id, [FromBody] UpdateAdminUserRoleDto dto)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var updated = await _userManagementService.UpdateUserRoleAsync(id, dto, currentUserId.Value);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:int}/password")]
+    public async Task<IActionResult> ResetUserPassword(int id, [FromBody] ResetAdminUserPasswordDto dto)
+    {
+        try
+        {
+            await _userManagementService.ResetUserPasswordAsync(id, dto);
+            return Ok(new { message = "Şifre güncellendi." });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private int? GetCurrentUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

@@ -317,6 +317,7 @@ const TeacherAppointmentPage: React.FC = () => {
 
       await createAppointment({
         lecturerName: selectedTeacher.name,
+        teacherId: selectedTeacher.id,
         course,
         reason: finalReason,
         date,
@@ -706,9 +707,7 @@ const TeacherAppointmentPage: React.FC = () => {
                           </p>
                           <p className="text-xs text-slate-600 mt-1">
                             Öğretim Elemanı:{" "}
-                            {(apt as any).teacherName ||
-                              (apt as any).lecturerName ||
-                              "Bilinmiyor"}
+                            {apt.teacherName || "Bilinmiyor"}
                             {apt.teacherDepartment && (
                               <span className="text-slate-500">
                                 {" "}· {apt.teacherDepartment}
