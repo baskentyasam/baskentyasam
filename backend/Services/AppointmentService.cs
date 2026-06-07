@@ -143,8 +143,8 @@ public class AppointmentService : IAppointmentService
 
     public async Task<Appointment> CreateAppointmentAsync(AppointmentCreateDto dto, int? currentUserId = null)
     {
-        // Öğrenci ID'sini belirle (dto'dan veya currentUserId'den)
-        int studentId = dto.StudentId ?? currentUserId ?? throw new ArgumentException("Öğrenci ID gereklidir.");
+        // Öğrenci ID'si yalnızca oturum açmış kullanıcıdan alınır (dto.StudentId yok sayılır)
+        int studentId = currentUserId ?? throw new ArgumentException("Öğrenci ID gereklidir.");
         var student = await _context.Users.FindAsync(studentId);
         if (student == null)
             throw new ArgumentException($"Öğrenci bulunamadı. StudentId: {studentId}");
@@ -443,68 +443,7 @@ public class AppointmentService : IAppointmentService
             _context.Entry(appointment).Property("ScheduledAt").CurrentValue = newScheduledAt;
         }
 
-        // Durum değişikliği (Hoca onay/red işlemi)
-        if (dto.Status.HasValue)
-        {
-            var oldStatus = appointment.Status;
-            appointment.Status = dto.Status.Value;
-            appointment.UpdatedAt = DateTime.Now;
-
-            // Rejected ise rejection_reason'u da güncelle
-            if (dto.Status.Value == AppointmentStatus.Rejected)
-            {
-                var rejectionReason = dto.RejectionReason ?? "Sebep belirtilmedi";
-                appointment.RejectionReason = rejectionReason;
-                var escapedReason = rejectionReason.Replace("'", "''");
-                
-                Console.WriteLine($"[DEBUG] UpdateAppointment - Rejecting ID: {appointment.Id}, Reason: {rejectionReason}");
-                
-                await _context.Database.ExecuteSqlRawAsync(
-                    $"UPDATE \"appointments\" SET \"responded_at\" = NOW(), \"rejection_reason\" = '{escapedReason}' WHERE \"id\" = {appointment.Id}");
-            }
-            else
-            {
-                // Onaylandı veya başka durum
-                appointment.RejectionReason = null;
-                
-                Console.WriteLine($"[DEBUG] UpdateAppointment - Approving ID: {appointment.Id}");
-                
-                await _context.Database.ExecuteSqlRawAsync(
-                    $"UPDATE \"appointments\" SET \"responded_at\" = NOW(), \"rejection_reason\" = NULL WHERE \"id\" = {appointment.Id}");
-            }
-
-            // Durum değişikliğinde bildirim gönder
-            var notificationType = dto.Status.Value switch
-            {
-                AppointmentStatus.Approved => NotificationType.AppointmentConfirmed,
-                AppointmentStatus.Rejected => NotificationType.AppointmentCancelled,
-                AppointmentStatus.Cancelled => NotificationType.AppointmentCancelled,
-                AppointmentStatus.Completed => NotificationType.AppointmentConfirmed,
-                _ => NotificationType.General
-            };
-
-            var statusMessage = dto.Status.Value switch
-            {
-                AppointmentStatus.Approved => "onaylanmıştır",
-                AppointmentStatus.Rejected => "reddedilmiştir",
-                AppointmentStatus.Cancelled => "iptal edilmiştir",
-                AppointmentStatus.Completed => "tamamlanmıştır",
-                _ => "güncellenmiştir"
-            };
-
-            // Öğrenciye bildirim (SignalR ile canlı bildirim)
-            if (appointment.Student != null && appointment.Teacher != null)
-            {
-                await _notificationService.SendNotificationAsync(
-                    $"Randevu Talebi {statusMessage}",
-                    $"Sayın {appointment.Student.Name}, {appointment.Date:dd.MM.yyyy} tarihinde {appointment.Time:hh\\:mm} saatindeki {appointment.Teacher.Name} hocasına olan randevu talebiniz {statusMessage}.",
-                    notificationType,
-                    appointment.Student.Email,
-                    appointment.Student.Id,
-                    appointment.Id
-                );
-            }
-        }
+        appointment.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
         
@@ -731,11 +670,12 @@ public class AppointmentService : IAppointmentService
         
         // Raw SQL ile sadece responded_at NULL olan (cevaplanmamış) randevuları al
         var appointmentIds = await _context.Database.SqlQueryRaw<int>(
-            $@"SELECT a.""id"" 
+            @"SELECT a.""id"" 
                FROM ""appointments"" a
-               WHERE a.""instructor_id"" = {teacherId}
+               WHERE a.""instructor_id"" = {0}
                AND a.""responded_at"" IS NULL
-               ORDER BY a.""created_at"" DESC"
+               ORDER BY a.""created_at"" DESC",
+            teacherId
         ).ToListAsync();
         
         System.Diagnostics.Debug.WriteLine($"GetPendingAppointmentsByTeacherEmailAsync: Teacher ID: {teacherId}, Bulunan randevu ID sayısı: {appointmentIds?.Count ?? 0}");
@@ -838,7 +778,8 @@ public class AppointmentService : IAppointmentService
 
         // responded_at kolonunu güncelle
         await _context.Database.ExecuteSqlRawAsync(
-            $"UPDATE \"appointments\" SET \"responded_at\" = NOW() WHERE \"id\" = {appointment.Id}");
+            "UPDATE \"appointments\" SET \"responded_at\" = NOW(), \"rejection_reason\" = NULL WHERE \"id\" = {0}",
+            appointment.Id);
         
         // scheduled_at'ten Date ve Time'ı yükle
         var scheduledAt = _context.Entry(appointment).Property<DateTime>("ScheduledAt").CurrentValue;
@@ -884,11 +825,10 @@ public class AppointmentService : IAppointmentService
         appointment.RejectionReason = rejectionReason ?? string.Empty;
 
         // responded_at ve rejection_reason kolonlarını güncelle
-        var escapedReason = (rejectionReason ?? string.Empty).Replace("'", "''");
-        var updateSql = $"UPDATE \"appointments\" SET \"responded_at\" = NOW(), \"rejection_reason\" = '{escapedReason}' WHERE \"id\" = {appointment.Id}";
-        Console.WriteLine($"[DEBUG] Executing SQL: {updateSql}");
-        
-        await _context.Database.ExecuteSqlRawAsync(updateSql);
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE \"appointments\" SET \"responded_at\" = NOW(), \"rejection_reason\" = {0} WHERE \"id\" = {1}",
+            rejectionReason ?? string.Empty,
+            appointment.Id);
         
         // scheduled_at'ten Date ve Time'ı yükle
         var scheduledAt = _context.Entry(appointment).Property<DateTime>("ScheduledAt").CurrentValue;

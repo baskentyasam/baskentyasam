@@ -56,15 +56,11 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
       else requestBody.role = "Student";
     }
 
-    console.log('Login request body:', requestBody); // Debug için
-
     // Backend endpoint'i /Auth/login (büyük harf ile)
     const response = await apiClient.post<BackendLoginResponse>('/Auth/login', requestBody);
 
     // Backend'den gelen response'u frontend formatına dönüştür
     const backendData = response.data;
-
-    console.log('Backend role:', backendData.role); // Debug için
 
     // Role'ü küçük harfe çevir ve normalize et
     const roleLower = (backendData.role || "").toLowerCase();
@@ -88,8 +84,6 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
       normalizedRole = "student";
     }
 
-    console.log('Normalized role:', normalizedRole); // Debug için
-
     // Frontend formatına dönüştür
     const loginResponse: LoginResponse = {
       token: backendData.token,
@@ -109,8 +103,6 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
 
     return loginResponse;
   } catch (error: any) {
-    console.error('Login error:', error.response?.data); // Debug için
-    
     // E-posta doğrulama hatası için özel mesaj
     const errorMessage = error.response?.data?.message || error.response?.data?.error;
     
@@ -152,8 +144,6 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
     const response = await apiClient.post<BackendLoginResponse>('/Auth/register', requestBody);
     const backendData = response.data;
 
-    console.log('Backend role (register):', backendData.role); // Debug için
-
     // Role'ü küçük harfe çevir ve normalize et
     const roleLower = (backendData.role || "").toLowerCase();
     let normalizedRole: "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
@@ -176,8 +166,6 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
       normalizedRole = "student";
     }
 
-    console.log('Normalized role (register):', normalizedRole); // Debug için
-
     const loginResponse: LoginResponse = {
       token: backendData.token,
       user: {
@@ -196,8 +184,6 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
 
     return loginResponse;
   } catch (error: any) {
-    console.error('Register error:', error.response?.data);
-    
     const errorMessage = error.response?.data?.message || error.response?.data?.error;
     
     let displayMessage = 'Kayıt yapılırken bir hata oluştu. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';

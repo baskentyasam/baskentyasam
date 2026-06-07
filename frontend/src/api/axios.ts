@@ -15,14 +15,9 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - Her istekten önce çalışır
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // LocalStorage'dan token'ı al ve header'a ekle
     const token = localStorage.getItem('token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
-      // Debug için token'ın gönderildiğini kontrol et
-      console.log('Token gönderiliyor:', token.substring(0, 20) + '...');
-    } else {
-      console.warn('Token bulunamadı! İstek authorization olmadan gönderiliyor.');
     }
     return config;
   },
@@ -48,4 +43,3 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
-

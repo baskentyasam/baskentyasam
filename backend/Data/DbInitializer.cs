@@ -8,100 +8,23 @@ namespace ApiProject.Data
 {
     public static class DbInitializer
     {
-        public static void Initialize(AppDbContext context)
+        private const int MinSuperAdminPasswordLength = 12;
+
+        public static void Initialize(AppDbContext context, IHostEnvironment environment)
         {
             context.Database.EnsureCreated();
 
-            // roles tablosu + FK varsa SuperAdmin/SubAdmin kayıtlarını idempotent ekle
             EnsureRoleCatalogRecords(context);
+            DeactivateLegacyAdmins(context);
 
-            // 1. KULLANICILARI EKLE
-            if (!context.Users.Any())
+            if (environment.IsDevelopment())
             {
-                var student = new User
-                {
-                    Name = "Ali Ogrenci",
-                    Email = "ali.ogrenci@baskent.edu.tr",
-                    Role = UserRole.Student,
-                    StudentNo = "20231001",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("baskent123"),
-                    IsActive = true
-                };
-
-                var teacher = new User
-                {
-                    Name = "Mehmet Hoca",
-                    Email = "hoca@baskent.edu.tr",
-                    Role = UserRole.Teacher,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("baskent123"),
-                    IsActive = true
-                };
-
-                context.Users.AddRange(student, teacher);
-                context.SaveChanges();
-            }
-            // Kasiyer hesabı: tek hesap, her zaman var olmalı
-            // Username olarak "kasiyer" yazılacağı için Name alanı da "kasiyer" tutuluyor.
-            // Email login'i desteklemek için de sabit bir email veriyoruz.
-            if (!context.Users.Any(u => u.Name.ToLower().Trim() == "kasiyer"))
-            {
-                var cashier = new User
-                {
-                    Name = "kasiyer",
-                    Email = "kasiyer@baskent.edu.tr",
-                    Role = UserRole.Staff,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
-                    IsActive = true
-                };
-
-                context.Users.Add(cashier);
-                context.SaveChanges();
-            }
-
-            // Legacy Admin hesaplarını yeni sistemden çıkar (silmeden pasifleştir)
-            var legacyAdmins = context.Users
-                .Where(u => u.Role == UserRole.Admin || u.Email.ToLower() == "admin@baskent.edu.tr")
-                .ToList();
-            if (legacyAdmins.Count > 0)
-            {
-                foreach (var legacyAdmin in legacyAdmins)
-                {
-                    legacyAdmin.IsActive = false;
-                }
-                context.SaveChanges();
-            }
-
-            // Sistem Yöneticisi hesabı (idempotent)
-            var superAdmin = context.Users.FirstOrDefault(u => u.Email.ToLower() == "systemadmin@baskentyasam.com");
-            if (superAdmin == null)
-            {
-                superAdmin = new User
-                {
-                    Name = "Sistem Yöneticisi",
-                    Email = "systemadmin@baskentyasam.com",
-                    Role = UserRole.SuperAdmin,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
-                    IsActive = true
-                };
-
-                context.Users.Add(superAdmin);
-                context.SaveChanges();
+                SeedDevelopmentUsers(context);
             }
             else
             {
-                if (!superAdmin.IsActive || superAdmin.Role != UserRole.SuperAdmin)
-                {
-                    superAdmin.IsActive = true;
-                    superAdmin.Role = UserRole.SuperAdmin;
-                    context.SaveChanges();
-                }
+                EnsureProductionSuperAdmin(context);
             }
-
-            // SuperAdmin login_type alanını doğrulanmış hale getir.
-            context.Database.ExecuteSqlRaw(
-                "UPDATE users SET login_type = 'school_email'::login_type WHERE email = {0}",
-                "systemadmin@baskentyasam.com"
-            );
 
             // 2. KAFETERYA SEED (idempotent)
             EnsureCafeteria(context, "Pergel Kafe", "Merkez Kampüs", "Merkezi öğrenci kafeteryası.");
@@ -142,44 +65,12 @@ namespace ApiProject.Data
                 }
             }
 
-            // 5. ÖRNEK SİPARİŞ EKLE
-            if (!context.Orders.Any())
+            if (environment.IsDevelopment())
             {
-                // Kullanıcıyı ve Yemeği bul
-                var ali = context.Users.FirstOrDefault(u => u.Email == "ali.ogrenci@baskent.edu.tr");
-                var burger = context.MenuItems.FirstOrDefault(m => m.Name == "Hamburger");
-
-                if (ali != null && burger != null)
-                {
-                    var order = new Order
-                    {
-                        UserId = ali.Id,
-                        UserType = OrderUserType.Student,
-                        CreatedAt = DateTime.UtcNow,
-                        OrderNumber = $"{DateTime.UtcNow:yyyyMMdd}-SEED",
-                        Status = OrderStatus.Preparing, // Mutfakta hazırlanıyor görünsün
-                        IsPaid = false,
-                        TotalAmount = burger.Price,
-                        CafeteriaId = burger.CafeteriaId ?? pergelCafeteria.Id
-                    };
-                    
-                    // Siparişi kaydet ki ID oluşsun
-                    context.Orders.Add(order);
-                    context.SaveChanges();
-
-                    // Sipariş Detayını ekle
-                    var orderItem = new OrderItem
-                    {
-                        OrderId = order.Id,
-                        MenuItemId = burger.Id,
-                        Quantity = 1,
-                        Price = burger.Price
-                    };
-                    context.OrderItems.Add(orderItem);
-                    context.SaveChanges();
-                }
+                SeedDevelopmentSampleOrder(context, pergelCafeteria);
             }
-            else
+
+            if (context.Orders.Any())
             {
                 var ordersWithoutCafeteria = context.Orders.Where(o => o.CafeteriaId == null).ToList();
                 if (ordersWithoutCafeteria.Count > 0)
@@ -191,6 +82,187 @@ namespace ApiProject.Data
                     context.SaveChanges();
                 }
             }
+        }
+
+        private static void SeedDevelopmentUsers(AppDbContext context)
+        {
+            if (!context.Users.Any())
+            {
+                var student = new User
+                {
+                    Name = "Ali Ogrenci",
+                    Email = "ali.ogrenci@baskent.edu.tr",
+                    Role = UserRole.Student,
+                    StudentNo = "20231001",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("baskent123"),
+                    IsActive = true
+                };
+
+                var teacher = new User
+                {
+                    Name = "Mehmet Hoca",
+                    Email = "hoca@baskent.edu.tr",
+                    Role = UserRole.Teacher,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("baskent123"),
+                    IsActive = true
+                };
+
+                context.Users.AddRange(student, teacher);
+                context.SaveChanges();
+            }
+
+            if (!context.Users.Any(u => u.Name.ToLower().Trim() == "kasiyer"))
+            {
+                var cashier = new User
+                {
+                    Name = "kasiyer",
+                    Email = "kasiyer@baskent.edu.tr",
+                    Role = UserRole.Staff,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+                    IsActive = true
+                };
+
+                context.Users.Add(cashier);
+                context.SaveChanges();
+            }
+
+            var superAdmin = context.Users.FirstOrDefault(u => u.Email.ToLower() == "systemadmin@baskentyasam.com");
+            if (superAdmin == null)
+            {
+                superAdmin = new User
+                {
+                    Name = "Sistem Yöneticisi",
+                    Email = "systemadmin@baskentyasam.com",
+                    Role = UserRole.SuperAdmin,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+                    IsActive = true
+                };
+
+                context.Users.Add(superAdmin);
+                context.SaveChanges();
+            }
+            else if (!superAdmin.IsActive || superAdmin.Role != UserRole.SuperAdmin)
+            {
+                superAdmin.IsActive = true;
+                superAdmin.Role = UserRole.SuperAdmin;
+                context.SaveChanges();
+            }
+
+            context.Database.ExecuteSqlRaw(
+                "UPDATE users SET login_type = 'school_email'::login_type WHERE email = {0}",
+                "systemadmin@baskentyasam.com");
+        }
+
+        private static void DeactivateLegacyAdmins(AppDbContext context)
+        {
+            var legacyAdmins = context.Users
+                .Where(u => u.Role == UserRole.Admin || u.Email.ToLower() == "admin@baskent.edu.tr")
+                .ToList();
+            if (legacyAdmins.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var legacyAdmin in legacyAdmins)
+            {
+                legacyAdmin.IsActive = false;
+            }
+
+            context.SaveChanges();
+        }
+
+        /// <summary>
+        /// Production: SuperAdmin yalnızca env ile oluşturulur. Şifre zayıfsa veya eksikse seed atlanır (mevcut DB silinmez).
+        /// </summary>
+        private static void EnsureProductionSuperAdmin(AppDbContext context)
+        {
+            var email = Environment.GetEnvironmentVariable("SUPERADMIN_EMAIL")?.Trim();
+            var password = Environment.GetEnvironmentVariable("SUPERADMIN_PASSWORD");
+            var name = Environment.GetEnvironmentVariable("SUPERADMIN_NAME")?.Trim() ?? "Sistem Yöneticisi";
+
+            var hasActiveSuperAdmin = context.Users.Any(u => u.Role == UserRole.SuperAdmin && u.IsActive);
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            {
+                if (!hasActiveSuperAdmin)
+                {
+                    Console.WriteLine("[WARN] Production: SUPERADMIN_EMAIL ve SUPERADMIN_PASSWORD ayarlanmadi; demo SuperAdmin olusturulmadi.");
+                }
+                return;
+            }
+
+            if (password.Length < MinSuperAdminPasswordLength)
+            {
+                Console.WriteLine($"[WARN] Production: SUPERADMIN_PASSWORD en az {MinSuperAdminPasswordLength} karakter olmali; SuperAdmin seed atlandi.");
+                return;
+            }
+
+            var normalizedEmail = email.ToLower();
+            var superAdmin = context.Users.FirstOrDefault(u => u.Email.ToLower() == normalizedEmail);
+            if (superAdmin == null)
+            {
+                superAdmin = new User
+                {
+                    Name = name,
+                    Email = normalizedEmail,
+                    Role = UserRole.SuperAdmin,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    IsActive = true
+                };
+                context.Users.Add(superAdmin);
+                context.SaveChanges();
+                Console.WriteLine($"[INFO] Production: SuperAdmin hesabi olusturuldu ({normalizedEmail}).");
+            }
+            else if (!superAdmin.IsActive || superAdmin.Role != UserRole.SuperAdmin)
+            {
+                superAdmin.IsActive = true;
+                superAdmin.Role = UserRole.SuperAdmin;
+                context.SaveChanges();
+            }
+
+            context.Database.ExecuteSqlRaw(
+                "UPDATE users SET login_type = 'school_email'::login_type WHERE email = {0}",
+                normalizedEmail);
+        }
+
+        private static void SeedDevelopmentSampleOrder(AppDbContext context, Cafeteria pergelCafeteria)
+        {
+            if (context.Orders.Any())
+            {
+                return;
+            }
+
+            var ali = context.Users.FirstOrDefault(u => u.Email == "ali.ogrenci@baskent.edu.tr");
+            var burger = context.MenuItems.FirstOrDefault(m => m.Name == "Hamburger");
+
+            if (ali == null || burger == null)
+            {
+                return;
+            }
+
+            var order = new Order
+            {
+                UserId = ali.Id,
+                UserType = OrderUserType.Student,
+                CreatedAt = DateTime.UtcNow,
+                OrderNumber = $"{DateTime.UtcNow:yyyyMMdd}-SEED",
+                Status = OrderStatus.Preparing,
+                IsPaid = false,
+                TotalAmount = burger.Price,
+                CafeteriaId = burger.CafeteriaId ?? pergelCafeteria.Id
+            };
+
+            context.Orders.Add(order);
+            context.SaveChanges();
+
+            context.OrderItems.Add(new OrderItem
+            {
+                OrderId = order.Id,
+                MenuItemId = burger.Id,
+                Quantity = 1,
+                Price = burger.Price
+            });
+            context.SaveChanges();
         }
 
         private static void EnsureCafeteria(AppDbContext context, string name, string location, string description)

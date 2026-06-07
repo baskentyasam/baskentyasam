@@ -138,14 +138,9 @@ export const createAppointment = async (
       requestReason: appointment.reason, // Öğrencinin yazdığı sebep (diğer seçeneğinde özel metin)
     };
 
-    console.log('Lecturer name:', appointment.lecturerName);
-    console.log('Backend request body:', JSON.stringify(backendRequest, null, 2)); // Debug için - detaylı göster
-
     const response = await apiClient.post<any>('/Appointment', backendRequest);
     return mapDtoToAppointment(response.data);
   } catch (error: any) {
-    console.error('Create appointment error:', error.response?.data); // Debug için
-
     // Backend validation hatalarını parse et
     let errorMessage = error.response?.data?.title || error.response?.data?.message || 'Randevu oluşturulurken bir hata oluştu';
 
@@ -225,59 +220,24 @@ export const getPendingRequests = async (): Promise<Appointment[]> => {
   }
 };
 
-// Randevu durumunu güncelle (onayla/reddet)
+// Randevu durumunu güncelle (onayla/reddet) — güvenli approve/reject endpointleri
 export const updateAppointmentStatus = async (
   appointmentId: string,
   status: 'approved' | 'rejected',
-  appointment?: Appointment, // Mevcut appointment bilgileri (opsiyonel)
+  _appointment?: Appointment,
   rejectionReason?: string
 ): Promise<Appointment> => {
   try {
-    // Backend'de PUT /api/Appointment/{id} kullanılıyor
-    // Backend tüm appointment bilgilerini bekliyor (date, time, subject, status)
-
-    let updateData: any;
-
-    if (appointment) {
-      // Mevcut appointment bilgilerini kullan
-      // Date'i ISO formatına çevir
-      let isoDate = appointment.date;
-      if (!isoDate.includes('T')) {
-        // Eğer sadece tarih varsa, time ile birleştir
-        isoDate = `${appointment.date}T${appointment.time}:00.000Z`;
-      }
-
-      // Backend artık time'ı string formatında ("HH:mm") kabul ediyor
-      const timeString = appointment.time; // Zaten "HH:mm" formatında
-
-      // Status'u number'a çevir (0: pending, 1: approved, 2: rejected gibi)
-      const statusNumber = status === 'approved' ? 1 : status === 'rejected' ? 2 : 0;
-
-      updateData = {
-        date: isoDate,
-        time: timeString, // String format: "HH:mm" (örn: "14:30")
-        subject: appointment.course || '', // Backend'de subject, frontend'de course
-        status: statusNumber,
-      };
-
-      if (status === 'rejected' && rejectionReason) {
-        updateData.rejectionReason = rejectionReason;
-      }
-    } else {
-      // Eğer appointment bilgisi yoksa, sadece status gönder (backend kabul ederse)
-      const statusNumber = status === 'approved' ? 1 : status === 'rejected' ? 2 : 0;
-      updateData = {
-        status: statusNumber,
-      };
-      if (status === 'rejected' && rejectionReason) {
-        updateData.rejectionReason = rejectionReason;
-      }
+    if (status === 'approved') {
+      const response = await apiClient.post<any>(`/Appointment/${appointmentId}/approve`);
+      return mapDtoToAppointment(response.data);
     }
 
-    const response = await apiClient.put<any>(`/Appointment/${appointmentId}`, updateData);
+    const response = await apiClient.post<any>(`/Appointment/${appointmentId}/reject`, {
+      rejectionReason: rejectionReason ?? 'Sebep belirtilmedi',
+    });
     return mapDtoToAppointment(response.data);
   } catch (error: any) {
-    console.error('Update appointment error:', error.response?.data);
     throw {
       message: error.response?.data?.message || 'Randevu durumu güncellenirken bir hata oluştu',
       status: error.response?.status,

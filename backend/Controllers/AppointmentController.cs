@@ -1,5 +1,6 @@
 using ApiProject.Models.DTOs;
 using ApiProject.Services;
+using ApiProject.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -13,17 +14,23 @@ public class AppointmentController : ControllerBase
 {
     private readonly IAppointmentService _appointmentService;
     private readonly ILogger<AppointmentController> _logger;
+    private readonly IWebHostEnvironment _environment;
 
-    public AppointmentController(IAppointmentService appointmentService, ILogger<AppointmentController> logger)
+    public AppointmentController(
+        IAppointmentService appointmentService,
+        ILogger<AppointmentController> logger,
+        IWebHostEnvironment environment)
     {
         _appointmentService = appointmentService;
         _logger = logger;
+        _environment = environment;
     }
 
     /// <summary>
-    /// Tüm randevuları getirir (sadece admin)
+    /// Tüm randevuları getirir (yalnızca SuperAdmin)
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "SuperAdmin")]
     public async Task<ActionResult<List<AppointmentResponseDto>>> GetAllAppointments()
     {
         try
@@ -160,6 +167,10 @@ public class AppointmentController : ControllerBase
             if (currentUserId == null)
                 return Unauthorized("Kullanıcı bilgisi bulunamadı");
 
+            var userRole = GetCurrentUserRole();
+            if (!string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase))
+                return Forbid("Randevu oluşturma yalnızca öğrenciler içindir.");
+
             var appointment = await _appointmentService.CreateAppointmentAsync(dto, currentUserId);
             return CreatedAtAction(nameof(GetAppointmentById), new { id = appointment.Id }, MapToDto(appointment));
         }
@@ -170,19 +181,20 @@ public class AppointmentController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Inner exception'ı logla - gerçek hatayı görmek için
             var innerException = ex.InnerException?.Message ?? ex.Message;
-            var fullException = ex.ToString();
-            
-            _logger.LogError(ex, "Randevu oluşturulurken hata oluştu. Inner Exception: {InnerException}, Full: {FullException}", 
-                innerException, fullException);
-            
-            // Gerçek hatayı frontend'e gönder
-            return BadRequest(new { 
-                message = $"Randevu oluşturulurken bir hata oluştu: {innerException}",
-                innerException = innerException,
-                fullException = fullException
-            });
+            _logger.LogError(ex, "Randevu oluşturulurken hata oluştu. Inner Exception: {InnerException}", innerException);
+
+            if (_environment.IsDevelopment())
+            {
+                return BadRequest(new
+                {
+                    message = $"Randevu oluşturulurken bir hata oluştu: {innerException}",
+                    innerException,
+                    fullException = ex.ToString()
+                });
+            }
+
+            return BadRequest(new { message = "Randevu oluşturulurken bir hata oluştu." });
         }
     }
 
@@ -194,21 +206,25 @@ public class AppointmentController : ControllerBase
     {
         try
         {
+            var existing = await _appointmentService.GetAppointmentByIdAsync(id);
+            if (existing == null)
+                return NotFound($"ID: {id} olan randevu bulunamadı");
+
+            var userEmail = GetCurrentUserEmail();
+            var userRole = GetCurrentUserRole();
+
+            if (string.IsNullOrEmpty(userEmail))
+                return Unauthorized("Kullanıcı bilgisi bulunamadı");
+
+            if (!CanModifyAppointment(existing, userEmail, userRole))
+                return Forbid("Bu randevuyu güncelleme yetkiniz yok");
+
+            if (dto.Status.HasValue)
+                return BadRequest(new { message = "Randevu durumu yalnızca onay/red endpointleri ile güncellenebilir." });
+
             var appointment = await _appointmentService.UpdateAppointmentAsync(id, dto);
             if (appointment == null)
                 return NotFound($"ID: {id} olan randevu bulunamadı");
-
-            // Kullanıcının kendi randevusu olduğunu kontrol et
-            var userEmail = GetCurrentUserEmail();
-            var userRole = GetCurrentUserRole();
-            if (!string.IsNullOrEmpty(userEmail) && userRole != "Admin")
-            {
-                if (appointment.Teacher?.Email.ToLower() != userEmail.ToLower() && 
-                    appointment.Student?.Email.ToLower() != userEmail.ToLower())
-                {
-                    return Forbid("Bu randevuyu güncelleme yetkiniz yok");
-                }
-            }
 
             return Ok(MapToDto(appointment));
         }
@@ -227,8 +243,36 @@ public class AppointmentController : ControllerBase
     {
         try
         {
-            var result = await _appointmentService.DeleteAppointmentAsync(id);
-            if (!result)
+            var appointment = await _appointmentService.GetAppointmentByIdAsync(id);
+            if (appointment == null)
+                return NotFound($"ID: {id} olan randevu bulunamadı");
+
+            var userEmail = GetCurrentUserEmail();
+            var userRole = GetCurrentUserRole();
+
+            if (string.IsNullOrEmpty(userEmail))
+                return Unauthorized("Kullanıcı bilgisi bulunamadı");
+
+            if (string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid("SuperAdmin randevu iptali için /api/admin/appointments/{id}/cancel endpointini kullanmalıdır.");
+            }
+
+            if (!CanCancelAppointmentAsOwner(userRole))
+                return Forbid("Bu randevuyu iptal etme yetkiniz yok");
+
+            if (!CanModifyAppointment(appointment, userEmail, userRole))
+                return Forbid("Bu randevuyu iptal etme yetkiniz yok");
+
+            if (appointment.Status != Models.AppointmentStatus.Pending)
+                return BadRequest(new { message = "Yalnızca bekleyen randevular iptal edilebilir." });
+
+            var cancelReason = string.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase)
+                ? "Öğretmen tarafından iptal edildi"
+                : "Öğrenci tarafından iptal edildi";
+
+            var cancelled = await _appointmentService.RejectAppointmentAsync(id, cancelReason);
+            if (cancelled == null)
                 return NotFound($"ID: {id} olan randevu bulunamadı");
 
             return NoContent();
@@ -402,6 +446,24 @@ public class AppointmentController : ControllerBase
     private string? GetCurrentUserRole()
     {
         return User.FindFirst(ClaimTypes.Role)?.Value;
+    }
+
+    private static bool CanModifyAppointment(Models.Appointment appointment, string userEmail, string? userRole)
+    {
+        var normalizedEmail = userEmail.ToLower();
+        if (string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase))
+            return appointment.Student?.Email.ToLower() == normalizedEmail;
+
+        if (string.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase))
+            return appointment.Teacher?.Email.ToLower() == normalizedEmail;
+
+        return false;
+    }
+
+    private static bool CanCancelAppointmentAsOwner(string? userRole)
+    {
+        return string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -43,27 +43,23 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Kasiyer kısayolu: kullanıcı adı/şifre bu ise otomatik kasiyer rolüyle login dene
+      // Kasiyer kısayolu yalnızca development build'de (production'da görünmez/kullanılmaz)
+      const isDevelopment = process.env.NODE_ENV === "development";
       const isCashierShortcut =
-        username.trim().toLowerCase() === "kasiyer" && password === "123456";
+        isDevelopment &&
+        username.trim().toLowerCase() === "kasiyer" &&
+        password === "123456";
 
       const roleToUse = isCashierShortcut ? "cashier" : role;
 
       const response = await login({ username, password, role: roleToUse });
 
-      console.log('Login response:', response); // Debug için
-      console.log('User role:', response.user.role); // Debug için
-
       // Başarılı giriş sonrası role göre yönlendir
-      // Backend'den gelen role değerini kullan (normalizedRole: 'student' veya 'instructor')
       const userRole = response.user.role;
-      console.log('Navigating with role:', userRole); // Debug için
 
       if (userRole === "student") {
-        console.log('Navigating to /ogrenci'); // Debug için
         navigate("/ogrenci", { replace: true });
       } else if (userRole === "instructor") {
-        console.log('Navigating to /ogretim-elemani'); // Debug için
         navigate("/ogretim-elemani", { replace: true });
       } else if (userRole === "cashier") {
         navigate("/kasiyer/siparisler", { replace: true });
@@ -72,8 +68,6 @@ const LoginPage: React.FC = () => {
       } else if (userRole === "subadmin") {
         navigate("/admin/panel", { replace: true });
       } else {
-        // Eğer role belirlenemezse, seçilen role göre yönlendir
-        console.log('Role not determined, using selected role:', role); // Debug için
         if (role === "student") {
           navigate("/ogrenci", { replace: true });
         } else if (role === "instructor") {
@@ -116,29 +110,20 @@ const LoginPage: React.FC = () => {
         studentNo: role === "student" ? undefined : undefined,
       });
 
-      console.log('Register response:', response); // Debug için
-
       // KONTROL: Token yoksa (Email doğrulama gerekli) yönlendirme YAPMA
       if (!response.token) {
         setSuccess("Kayıt başarılı! 🎉\n\nE-posta adresinize bir doğrulama linki gönderdik. Lütfen e-postanızı kontrol edin ve doğrulama linkine tıklayın.\n\nE-postayı bulamıyorsanız spam klasörünü kontrol etmeyi unutmayın.");
         setIsSignup(false);
         setUsername("");
         setPassword("");
-        return; // Fonksiyondan çık, yönlendirme yapma
+        return;
       }
 
-      console.log('User role:', response.user.role); // Debug için
-
-      // Kayıt sonrası role göre yönlendir
-      // Backend'den gelen role değerini kullan (normalizedRole: 'student' veya 'instructor')
       const userRole = response.user.role;
-      console.log('Navigating with role (register):', userRole); // Debug için
 
       if (userRole === "student") {
-        console.log('Navigating to /ogrenci (register)'); // Debug için
         navigate("/ogrenci", { replace: true });
       } else if (userRole === "instructor") {
-        console.log('Navigating to /ogretim-elemani (register)'); // Debug için
         navigate("/ogretim-elemani", { replace: true });
       } else if (userRole === "cashier") {
         navigate("/kasiyer/siparisler", { replace: true });
@@ -147,8 +132,6 @@ const LoginPage: React.FC = () => {
       } else if (userRole === "subadmin") {
         navigate("/admin/panel", { replace: true });
       } else {
-        // Eğer role belirlenemezse, seçilen role göre yönlendir
-        console.log('Role not determined, using selected role (register):', role); // Debug için
         if (role === "student") {
           navigate("/ogrenci", { replace: true });
         } else if (role === "instructor") {

@@ -30,7 +30,9 @@ public class EmailService : IEmailService
             var smtpHost = smtpSettings["Host"] ?? "smtp.gmail.com";
             var smtpPort = int.Parse(smtpSettings["Port"] ?? "587");
             var smtpUsername = smtpSettings["Username"] ?? "";
-            var smtpPassword = smtpSettings["Password"] ?? "";
+            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD")
+                ?? smtpSettings["Password"]
+                ?? "";
             var smtpFromEmail = smtpSettings["FromEmail"] ?? smtpUsername;
             var smtpFromName = smtpSettings["FromName"] ?? "Başkent Üniversitesi";
             
@@ -180,7 +182,9 @@ public class EmailService : IEmailService
             var smtpHost = smtpSettings["Host"] ?? "smtp.gmail.com";
             var smtpPort = int.Parse(smtpSettings["Port"] ?? "587");
             var smtpUsername = smtpSettings["Username"] ?? "";
-            var smtpPassword = smtpSettings["Password"] ?? "";
+            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD")
+                ?? smtpSettings["Password"]
+                ?? "";
             var smtpFromEmail = smtpSettings["FromEmail"] ?? smtpUsername;
             var smtpFromName = smtpSettings["FromName"] ?? "Başkent Üniversitesi";
 

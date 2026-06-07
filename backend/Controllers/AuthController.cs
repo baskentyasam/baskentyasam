@@ -2,8 +2,10 @@ using ApiProject.Models.DTOs;
 using ApiProject.Services;
 using ApiProject.Data;
 using ApiProject.Models;
+using ApiProject.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -15,14 +17,17 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly AppDbContext _context;
+    private readonly IWebHostEnvironment _environment;
 
-    public AuthController(IAuthService authService, AppDbContext context)
+    public AuthController(IAuthService authService, AppDbContext context, IWebHostEnvironment environment)
     {
         _authService = authService;
         _context = context;
+        _environment = environment;
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterDto registerDto)
     {
         // Request body null kontrolü
@@ -71,33 +76,16 @@ public class AuthController : ControllerBase
         }
         catch (DbUpdateException dbEx)
         {
-            // Veritabanı güncelleme hatalarını daha detaylı göster
-            var errorMessage = dbEx.Message;
-            if (dbEx.InnerException != null)
-            {
-                errorMessage += " | Inner: " + dbEx.InnerException.Message;
-            }
-            // PostgreSQL hata kodunu ve mesajını göster
-            return StatusCode(500, new { 
-                message = "Kayıt işlemi sırasında veritabanı hatası oluştu.", 
-                error = errorMessage,
-                innerError = dbEx.InnerException?.Message,
-                stackTrace = dbEx.StackTrace
-            });
+            return StatusCode(500, ApiErrorHelper.ServerError(_environment, dbEx, "Kayıt işlemi sırasında veritabanı hatası oluştu."));
         }
         catch (Exception ex)
         {
-            // Inner exception varsa onu da göster
-            var errorMessage = ex.Message;
-            if (ex.InnerException != null)
-            {
-                errorMessage += " | Inner: " + ex.InnerException.Message;
-            }
-            return StatusCode(500, new { message = "Kayıt işlemi sırasında bir hata oluştu.", error = errorMessage, innerError = ex.InnerException?.Message });
+            return StatusCode(500, ApiErrorHelper.ServerError(_environment, ex, "Kayıt işlemi sırasında bir hata oluştu."));
         }
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto loginDto)
     {
         // Request body null kontrolü
@@ -127,7 +115,7 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Giriş işlemi sırasında bir hata oluştu.", error = ex.Message });
+            return StatusCode(500, ApiErrorHelper.ServerError(_environment, ex, "Giriş işlemi sırasında bir hata oluştu."));
         }
     }
 
@@ -135,6 +123,7 @@ public class AuthController : ControllerBase
     /// Şifre sıfırlama talebi. E-posta yoksa bile aynı genel mesaj (enumeration azaltma).
     /// </summary>
     [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto dto)
     {
         if (dto == null)
@@ -153,11 +142,11 @@ public class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(500, new { message = ex.Message });
+            return StatusCode(500, ApiErrorHelper.ServerError(_environment, ex, "E-posta gönderilirken bir hata oluştu."));
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "İşlem sırasında bir hata oluştu.", error = ex.Message });
+            return StatusCode(500, ApiErrorHelper.ServerError(_environment, ex));
         }
     }
 
@@ -165,6 +154,7 @@ public class AuthController : ControllerBase
     /// E-postadaki token ile yeni şifre belirleme.
     /// </summary>
     [HttpPost("reset-password")]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordRequestDto dto)
     {
         if (dto == null)
@@ -188,7 +178,7 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Şifre güncellenirken bir hata oluştu.", error = ex.Message });
+            return StatusCode(500, ApiErrorHelper.ServerError(_environment, ex, "Şifre güncellenirken bir hata oluştu."));
         }
     }
 
@@ -363,9 +353,10 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Tüm kullanıcıları listeler (Email ve şifre gösterilmez)
+    /// Tüm kullanıcıları listeler (yalnızca SuperAdmin)
     /// </summary>
     [HttpGet("users")]
+    [Authorize(Roles = "SuperAdmin")]
     public async Task<ActionResult<List<UserResponseDto>>> GetAllUsers()
     {
         try
@@ -640,6 +631,11 @@ public class AuthController : ControllerBase
     [HttpGet("debug-schema")]
     public IActionResult DebugSchema()
     {
+        if (!_environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         try 
         {
             var columns = new List<string>();

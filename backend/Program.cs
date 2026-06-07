@@ -4,8 +4,10 @@ using ApiProject.Services.Background;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
 using Serilog;
 using ApiProject.Hubs;
 using System.Text.Json.Serialization;
@@ -87,6 +89,46 @@ try
     var jwtSettings = builder.Configuration.GetSection("Jwt");
     var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey bulunamadı.");
 
+    if (!builder.Environment.IsDevelopment())
+    {
+        if (string.IsNullOrWhiteSpace(secretKey)
+            || secretKey.Equals("OVERRIDE_VIA_ENV_VAR", StringComparison.OrdinalIgnoreCase)
+            || secretKey.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "Production ortamında Jwt:SecretKey ortam değişkeni ile güçlü bir değer (en az 32 karakter) ayarlanmalıdır.");
+        }
+
+        var configuredConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrEmpty(configuredConnection)
+            && configuredConnection.Contains("OVERRIDE_VIA_ENV_VAR", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Production ortamında ConnectionStrings__DefaultConnection ayarlanmalıdır.");
+        }
+
+        var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL");
+        if (string.IsNullOrWhiteSpace(frontendUrl))
+        {
+            throw new InvalidOperationException(
+                "Production ortamında FRONTEND_URL ortam değişkeni ayarlanmalıdır.");
+        }
+    }
+
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("auth", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+    });
+
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -146,23 +188,48 @@ try
     // CORS yapılandırması (Frontend bağlantısı için)
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy("AllowAll", policy =>
+        options.AddPolicy("AppCors", policy =>
         {
-            policy.WithOrigins(
-                    "http://localhost:3000", 
-                    "http://localhost:5173", 
-                    "http://localhost:4200", 
-                    "http://localhost:8080",
-                    "http://baskent_web",
-                    "http://web"
-                  )
-                  .AllowAnyMethod()
+            if (builder.Environment.IsDevelopment())
+            {
+                policy.WithOrigins(
+                        "http://localhost:3000",
+                        "http://localhost:5173",
+                        "http://localhost:4200",
+                        "http://localhost:8080",
+                        "http://baskent_web",
+                        "http://web"
+                      );
+            }
+            else
+            {
+                var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL")!.Trim().TrimEnd('/');
+                policy.WithOrigins(frontendUrl);
+            }
+
+            policy.AllowAnyMethod()
                   .AllowAnyHeader()
-                  .AllowCredentials(); // SignalR ve cookie desteği için
+                  .AllowCredentials();
         });
     });
 
     var app = builder.Build();
+
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler(errorApp =>
+        {
+            errorApp.Run(async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    message = "İşlem sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin."
+                });
+            });
+        });
+    }
 
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
@@ -178,7 +245,9 @@ try
         app.UseHttpsRedirection();
     }
 
-    app.UseCors("AllowAll");
+    app.UseCors("AppCors");
+
+    app.UseRateLimiter();
 
     app.UseAuthentication();
     app.UseAuthorization();
@@ -306,7 +375,7 @@ try
             }
             
             // Veritabanını oluştur ve verileri bas
-            ApiProject.Data.DbInitializer.Initialize(context);
+            ApiProject.Data.DbInitializer.Initialize(context, app.Environment);
         }
         catch (Exception ex)
         {

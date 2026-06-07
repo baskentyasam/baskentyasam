@@ -281,7 +281,10 @@ public class AuthService : IAuthService
         var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey bulunamadı.");
         var issuer = jwtSettings["Issuer"] ?? "ApiProject";
         var audience = jwtSettings["Audience"] ?? "ApiProjectUsers";
-        var expiryMinutes = int.Parse(jwtSettings["ExpiryMinutes"] ?? "1440"); // Varsayılan 24 saat
+        var expiryMinutes = int.Parse(
+            Environment.GetEnvironmentVariable("JWT_EXPIRES_MINUTES")
+            ?? jwtSettings["ExpiryMinutes"]
+            ?? "120");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
