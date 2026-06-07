@@ -424,6 +424,8 @@ namespace ApiProject.Data
                     Id = 1,
                     CurrentOccupancy = legacyOccupancy,
                     LastUpdatedAt = DateTime.UtcNow,
+                    ScheduleMode = "normal",
+                    ExamOpenFloorCodesJson = "[\"minus1\",\"ground\",\"floor1\",\"floor2\",\"h24\"]",
                 });
                 context.SaveChanges();
             }

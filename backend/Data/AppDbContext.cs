@@ -202,6 +202,8 @@ namespace ApiProject.Data
                 entity.Property(e => e.Id).HasColumnName("id");
                 entity.Property(e => e.CurrentOccupancy).HasColumnName("current_occupancy");
                 entity.Property(e => e.LastUpdatedAt).HasColumnName("last_updated_at");
+                entity.Property(e => e.ScheduleMode).HasColumnName("schedule_mode").HasMaxLength(20).HasDefaultValue("normal");
+                entity.Property(e => e.ExamOpenFloorCodesJson).HasColumnName("exam_open_floor_codes_json");
             });
 
             // Appointment entity column mappings - snake_case kolon adları

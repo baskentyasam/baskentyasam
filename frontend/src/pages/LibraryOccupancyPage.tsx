@@ -107,6 +107,11 @@ const LibraryOccupancyPage: React.FC = () => {
                 <p className="text-slate-600 text-base">
                   Doluluk oranı, o an açık olan katların toplam kapasitesine göre hesaplanır.
                 </p>
+                {data.scheduleDescription && (
+                  <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    {data.scheduleDescription}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

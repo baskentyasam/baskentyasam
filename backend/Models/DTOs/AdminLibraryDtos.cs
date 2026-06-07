@@ -19,11 +19,27 @@ public class LibraryOccupancySnapshotDto
     public int AvailableSlots { get; set; }
     public int OccupancyRate { get; set; }
     public DateTime? LastUpdatedAt { get; set; }
+    public string ScheduleMode { get; set; } = "normal";
+    public string ScheduleDescription { get; set; } = string.Empty;
     public List<LibraryFloorDto> Floors { get; set; } = new();
 }
 
 public class LibraryAdminOverviewDto : LibraryOccupancySnapshotDto
 {
+    public List<string> ExamOpenFloorCodes { get; set; } = new();
+}
+
+public class UpdateLibraryScheduleModeDto
+{
+    [Required]
+    [MaxLength(20)]
+    public string ScheduleMode { get; set; } = string.Empty;
+}
+
+public class UpdateLibraryExamFloorsDto
+{
+    [Required]
+    public List<string> OpenFloorCodes { get; set; } = new();
 }
 
 public class UpdateLibraryOpenFloorsDto

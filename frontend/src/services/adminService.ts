@@ -87,12 +87,17 @@ export interface LibraryFloorAdmin {
   sortOrder: number;
 }
 
+export type LibraryScheduleMode = "manual" | "normal" | "exam";
+
 export interface LibraryAdminOverview {
   currentOccupancy: number;
   openCapacity: number;
   availableSlots: number;
   occupancyRate: number;
   lastUpdatedAt?: string | null;
+  scheduleMode: LibraryScheduleMode;
+  scheduleDescription: string;
+  examOpenFloorCodes: string[];
   floors: LibraryFloorAdmin[];
 }
 
@@ -225,6 +230,16 @@ export const updateLibraryCapacities = async (
 
 export const updateLibraryOccupancy = async (currentOccupancy: number) => {
   const res = await apiClient.put<LibraryAdminOverview>("/admin/library/occupancy", { currentOccupancy });
+  return res.data;
+};
+
+export const updateLibraryScheduleMode = async (scheduleMode: LibraryScheduleMode) => {
+  const res = await apiClient.put<LibraryAdminOverview>("/admin/library/schedule/mode", { scheduleMode });
+  return res.data;
+};
+
+export const updateLibraryExamFloors = async (openFloorCodes: string[]) => {
+  const res = await apiClient.put<LibraryAdminOverview>("/admin/library/schedule/exam-floors", { openFloorCodes });
   return res.data;
 };
 

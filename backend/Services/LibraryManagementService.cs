@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApiProject.Data;
 using ApiProject.Models;
 using ApiProject.Models.DTOs;
@@ -12,10 +13,17 @@ public interface ILibraryManagementService
     Task<LibraryAdminOverviewDto> UpdateOpenFloorsAsync(IReadOnlyList<string> openFloorCodes);
     Task<LibraryAdminOverviewDto> UpdateCapacitiesAsync(IReadOnlyList<UpdateLibraryFloorCapacityDto> floors);
     Task<LibraryAdminOverviewDto> UpdateOccupancyAsync(int currentOccupancy);
+    Task<LibraryAdminOverviewDto> UpdateScheduleModeAsync(string scheduleMode);
+    Task<LibraryAdminOverviewDto> UpdateExamOpenFloorsAsync(IReadOnlyList<string> openFloorCodes);
 }
 
 public class LibraryManagementService : ILibraryManagementService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private readonly AppDbContext _context;
 
     public LibraryManagementService(AppDbContext context)
@@ -53,8 +61,9 @@ public class LibraryManagementService : ILibraryManagementService
             floor.IsOpen = normalized.Contains(floor.Code.ToLowerInvariant());
         }
 
-        await _context.SaveChangesAsync();
         var status = await GetStatusAsync();
+        status.ScheduleMode = LibraryScheduleModes.Manual;
+        await _context.SaveChangesAsync();
         return BuildOverview(floors, status);
     }
 
@@ -93,6 +102,69 @@ public class LibraryManagementService : ILibraryManagementService
         return BuildOverview(floors, status);
     }
 
+    public async Task<LibraryAdminOverviewDto> UpdateScheduleModeAsync(string scheduleMode)
+    {
+        if (!LibraryScheduleResolver.IsValidMode(scheduleMode))
+        {
+            throw new InvalidOperationException("Geçersiz çalışma modu. manual, normal veya exam olmalıdır.");
+        }
+
+        await EnsureSeededAsync();
+        var floors = await GetOrderedFloorsAsync();
+        var status = await GetStatusAsync();
+        var normalizedMode = LibraryScheduleResolver.NormalizeMode(scheduleMode);
+
+        if (normalizedMode == LibraryScheduleModes.Manual)
+        {
+            var effectiveCodes = LibraryScheduleResolver.ResolveOpenFloorCodes(
+                status.ScheduleMode,
+                DeserializeExamCodes(status.ExamOpenFloorCodesJson),
+                floors);
+
+            foreach (var floor in floors)
+            {
+                floor.IsOpen = effectiveCodes.Contains(floor.Code.ToLowerInvariant());
+            }
+        }
+        else if (normalizedMode == LibraryScheduleModes.Exam && string.IsNullOrWhiteSpace(status.ExamOpenFloorCodesJson))
+        {
+            status.ExamOpenFloorCodesJson = SerializeExamCodes(LibraryFloorSeed.DefaultFloorCodes());
+        }
+
+        status.ScheduleMode = normalizedMode;
+        await _context.SaveChangesAsync();
+        return BuildOverview(floors, status);
+    }
+
+    public async Task<LibraryAdminOverviewDto> UpdateExamOpenFloorsAsync(IReadOnlyList<string> openFloorCodes)
+    {
+        await EnsureSeededAsync();
+        var floors = await GetOrderedFloorsAsync();
+        var status = await GetStatusAsync();
+
+        if (LibraryScheduleResolver.NormalizeMode(status.ScheduleMode) != LibraryScheduleModes.Exam)
+        {
+            throw new InvalidOperationException("Sınav katları yalnızca exam modunda güncellenebilir.");
+        }
+
+        var validCodes = floors.Select(f => f.Code.ToLowerInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var normalized = openFloorCodes
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim().ToLowerInvariant())
+            .Where(validCodes.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count == 0)
+        {
+            throw new InvalidOperationException("En az bir geçerli kat seçilmelidir.");
+        }
+
+        status.ExamOpenFloorCodesJson = SerializeExamCodes(normalized);
+        await _context.SaveChangesAsync();
+        return BuildOverview(floors, status);
+    }
+
     private async Task<List<LibraryFloor>> GetOrderedFloorsAsync()
     {
         return await _context.LibraryFloors
@@ -106,8 +178,20 @@ public class LibraryManagementService : ILibraryManagementService
         var status = await _context.LibraryStatuses.FindAsync(1);
         if (status == null)
         {
-            status = new LibraryStatus { Id = 1, CurrentOccupancy = 0, LastUpdatedAt = DateTime.UtcNow };
+            status = new LibraryStatus
+            {
+                Id = 1,
+                CurrentOccupancy = 0,
+                LastUpdatedAt = DateTime.UtcNow,
+                ScheduleMode = LibraryScheduleModes.Normal,
+            };
             _context.LibraryStatuses.Add(status);
+            await _context.SaveChangesAsync();
+        }
+
+        if (string.IsNullOrWhiteSpace(status.ScheduleMode))
+        {
+            status.ScheduleMode = LibraryScheduleModes.Normal;
             await _context.SaveChangesAsync();
         }
 
@@ -132,6 +216,8 @@ public class LibraryManagementService : ILibraryManagementService
             Id = 1,
             CurrentOccupancy = legacyOccupancy,
             LastUpdatedAt = DateTime.UtcNow,
+            ScheduleMode = LibraryScheduleModes.Normal,
+            ExamOpenFloorCodesJson = SerializeExamCodes(LibraryFloorSeed.DefaultFloorCodes()),
         });
         await _context.SaveChangesAsync();
     }
@@ -149,25 +235,44 @@ public class LibraryManagementService : ILibraryManagementService
         return Math.Min(100, Math.Max(0, (int)Math.Round(occupancy * 100.0 / openCapacity)));
     }
 
-    private static LibraryAdminOverviewDto BuildOverview(IReadOnlyList<LibraryFloor> floors, LibraryStatus status)
+    private LibraryAdminOverviewDto BuildOverview(IReadOnlyList<LibraryFloor> floors, LibraryStatus status)
     {
-        var openCapacity = CalculateOpenCapacity(floors);
-        var rate = CalculateOccupancyRate(status.CurrentOccupancy, openCapacity);
-
+        var snapshot = BuildSnapshot(floors, status);
         return new LibraryAdminOverviewDto
         {
-            CurrentOccupancy = status.CurrentOccupancy,
-            OpenCapacity = openCapacity,
-            AvailableSlots = Math.Max(openCapacity - status.CurrentOccupancy, 0),
-            OccupancyRate = rate,
-            LastUpdatedAt = status.LastUpdatedAt,
-            Floors = floors.Select(MapFloor).ToList(),
+            CurrentOccupancy = snapshot.CurrentOccupancy,
+            OpenCapacity = snapshot.OpenCapacity,
+            AvailableSlots = snapshot.AvailableSlots,
+            OccupancyRate = snapshot.OccupancyRate,
+            LastUpdatedAt = snapshot.LastUpdatedAt,
+            ScheduleMode = snapshot.ScheduleMode,
+            ScheduleDescription = snapshot.ScheduleDescription,
+            Floors = snapshot.Floors,
+            ExamOpenFloorCodes = DeserializeExamCodes(status.ExamOpenFloorCodesJson),
         };
     }
 
-    private static LibraryOccupancySnapshotDto BuildSnapshot(IReadOnlyList<LibraryFloor> floors, LibraryStatus status)
+    private LibraryOccupancySnapshotDto BuildSnapshot(IReadOnlyList<LibraryFloor> floors, LibraryStatus status)
     {
-        var openCapacity = CalculateOpenCapacity(floors);
+        var examCodes = DeserializeExamCodes(status.ExamOpenFloorCodesJson);
+        var effectiveOpenCodes = LibraryScheduleResolver.ResolveOpenFloorCodes(
+            status.ScheduleMode,
+            examCodes,
+            floors);
+
+        var effectiveFloors = floors
+            .Select(floor => new LibraryFloor
+            {
+                Id = floor.Id,
+                Code = floor.Code,
+                Name = floor.Name,
+                MaxCapacity = floor.MaxCapacity,
+                SortOrder = floor.SortOrder,
+                IsOpen = effectiveOpenCodes.Contains(floor.Code.ToLowerInvariant()),
+            })
+            .ToList();
+
+        var openCapacity = CalculateOpenCapacity(effectiveFloors);
         var rate = CalculateOccupancyRate(status.CurrentOccupancy, openCapacity);
 
         return new LibraryOccupancySnapshotDto
@@ -177,7 +282,9 @@ public class LibraryManagementService : ILibraryManagementService
             AvailableSlots = Math.Max(openCapacity - status.CurrentOccupancy, 0),
             OccupancyRate = rate,
             LastUpdatedAt = status.LastUpdatedAt,
-            Floors = floors.Select(MapFloor).ToList(),
+            ScheduleMode = LibraryScheduleResolver.NormalizeMode(status.ScheduleMode),
+            ScheduleDescription = LibraryScheduleResolver.GetScheduleDescription(status.ScheduleMode),
+            Floors = effectiveFloors.Select(MapFloor).ToList(),
         };
     }
 
@@ -190,6 +297,38 @@ public class LibraryManagementService : ILibraryManagementService
         IsOpen = floor.IsOpen,
         SortOrder = floor.SortOrder,
     };
+
+    private static List<string> DeserializeExamCodes(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return LibraryFloorSeed.DefaultFloorCodes();
+        }
+
+        try
+        {
+            var codes = JsonSerializer.Deserialize<List<string>>(json, JsonOptions);
+            return codes?
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.Trim().ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                ?? LibraryFloorSeed.DefaultFloorCodes();
+        }
+        catch
+        {
+            return LibraryFloorSeed.DefaultFloorCodes();
+        }
+    }
+
+    private static string SerializeExamCodes(IEnumerable<string> codes) =>
+        JsonSerializer.Serialize(
+            codes
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.Trim().ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            JsonOptions);
 }
 
 public static class LibraryFloorSeed
@@ -202,4 +341,7 @@ public static class LibraryFloorSeed
         new LibraryFloor { Code = "floor2", Name = "2. Kat", MaxCapacity = 90, IsOpen = true, SortOrder = 4 },
         new LibraryFloor { Code = "h24", Name = "7/24 Alanı", MaxCapacity = 120, IsOpen = true, SortOrder = 5 },
     ];
+
+    public static List<string> DefaultFloorCodes() =>
+        DefaultFloors().Select(f => f.Code).ToList();
 }

@@ -80,6 +80,46 @@ public class AdminLibraryController : ControllerBase
         }
     }
 
+    [HttpPut("schedule/mode")]
+    public async Task<ActionResult<LibraryAdminOverviewDto>> UpdateScheduleMode(
+        [FromBody] UpdateLibraryScheduleModeDto dto)
+    {
+        var denied = await EnsureLibraryAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
+        try
+        {
+            return Ok(await _libraryService.UpdateScheduleModeAsync(dto.ScheduleMode));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("schedule/exam-floors")]
+    public async Task<ActionResult<LibraryAdminOverviewDto>> UpdateExamOpenFloors(
+        [FromBody] UpdateLibraryExamFloorsDto dto)
+    {
+        var denied = await EnsureLibraryAccessAsync();
+        if (denied != null)
+        {
+            return denied;
+        }
+
+        try
+        {
+            return Ok(await _libraryService.UpdateExamOpenFloorsAsync(dto.OpenFloorCodes));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPut("occupancy")]
     public async Task<ActionResult<LibraryAdminOverviewDto>> UpdateOccupancy(
         [FromBody] UpdateLibraryOccupancyDto dto)

@@ -14,4 +14,10 @@ public class LibraryStatus
 
     [Required]
     public DateTime LastUpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [Required]
+    [MaxLength(20)]
+    public string ScheduleMode { get; set; } = "normal";
+
+    public string? ExamOpenFloorCodesJson { get; set; }
 }

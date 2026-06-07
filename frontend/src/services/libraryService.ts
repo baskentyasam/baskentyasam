@@ -9,12 +9,16 @@ export interface LibraryFloor {
   sortOrder: number;
 }
 
+export type LibraryScheduleMode = "manual" | "normal" | "exam";
+
 export interface LibraryOccupancySnapshot {
   currentOccupancy: number;
   openCapacity: number;
   availableSlots: number;
   occupancyRate: number;
   lastUpdatedAt?: string | null;
+  scheduleMode?: LibraryScheduleMode;
+  scheduleDescription?: string;
   floors: LibraryFloor[];
 }
 
