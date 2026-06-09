@@ -177,6 +177,35 @@ public class AdminCafeteriasController : ControllerBase
         return Ok(item);
     }
 
+    [HttpDelete("{cafeteriaId:int}/menu-items/{menuItemId:int}")]
+    public async Task<IActionResult> DeleteMenuItem(int cafeteriaId, int menuItemId)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        try
+        {
+            await _adminAuthorizationService.EnsureModuleScopeAccessAsync(
+                userId.Value, AdminModuleType.Cafeteria, cafeteriaId.ToString());
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+
+        var item = await _context.MenuItems.FirstOrDefaultAsync(m => m.Id == menuItemId && m.CafeteriaId == cafeteriaId);
+        if (item == null) return NotFound();
+
+        var hasOrderHistory = await _context.OrderItems.AnyAsync(oi => oi.MenuItemId == menuItemId);
+        if (hasOrderHistory)
+        {
+            return BadRequest(new { message = "Bu ürün sipariş geçmişinde kullanıldığı için silinemez. Pasifleştirmeyi deneyin." });
+        }
+
+        _context.MenuItems.Remove(item);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("{cafeteriaId:int}/orders")]
     public async Task<ActionResult<List<OrderResponseDto>>> GetOrders(int cafeteriaId)
     {

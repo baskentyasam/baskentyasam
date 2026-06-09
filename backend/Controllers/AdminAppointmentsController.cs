@@ -9,7 +9,7 @@ namespace ApiProject.Controllers;
 
 [ApiController]
 [Route("api/admin/appointments")]
-[Authorize(Roles = "SuperAdmin,SubAdmin")]
+[Authorize(Roles = "SuperAdmin")]
 public class AdminAppointmentsController : ControllerBase
 {
     private readonly IAdminAppointmentManagementService _adminAppointmentService;
@@ -423,18 +423,7 @@ public class AdminAppointmentsController : ControllerBase
             return null;
         }
 
-        try
-        {
-            await _adminAuthorizationService.EnsureModuleScopeAccessAsync(
-                userId.Value,
-                AdminModuleType.Appointment,
-                AdminAssignableScopes.AppointmentScopeKey);
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Forbid();
-        }
+        return Forbid();
     }
 
     private int? GetCurrentUserId()

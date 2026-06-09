@@ -37,9 +37,8 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly ILogger<AuthService> _logger;
 
-    // IN-MEMORY TOKEN STORAGE (Veritabanı şeması değiştirilemediği için)
-    // Key: Token, Value: UserId
-    private static readonly ConcurrentDictionary<string, int> _verificationTokens = new();
+    // NOT: E-posta doğrulama token'ları artık veritabanında saklanıyor (EmailVerificationToken tablosu).
+    // Eski in-memory ConcurrentDictionary kaldırıldı; Docker restart ve load balancer uyumlu.
 
     public AuthService(AppDbContext context, IConfiguration configuration, IEmailService emailService, ILogger<AuthService> logger)
     {
@@ -84,7 +83,9 @@ public class AuthService : IAuthService
         // Ham SQL ile kontrol yapıyoruz
         //
         // ÖZEL DURUM: Kasiyer + SuperAdmin + SubAdmin hesapları için doğrulama zorunlu değil.
-        var skipVerification = (user.Name.ToLower().Trim() == "kasiyer" && user.Role == UserRole.Staff)
+        // Staff kullanıcıları admin tarafından oluşturulur (public kayıt değil),
+        // dolayısıyla e-posta doğrulaması gerekmez. İsim kontrolü yerine rol kontrolü.
+        var skipVerification = user.Role == UserRole.Staff
             || user.Role == UserRole.SuperAdmin
             || user.Role == UserRole.SubAdmin;
         if (!skipVerification)
@@ -255,12 +256,24 @@ public class AuthService : IAuthService
             throw new InvalidOperationException($"Kayıt işlemi sırasında bir hata oluştu: {ex.Message}");
         }
 
-        // Email doğrulama token'ı oluştur (GUID)
-        var verificationToken = Guid.NewGuid().ToString();
-        
-        // Token'ı belleğe kaydet
-        _verificationTokens.TryAdd(verificationToken, user.Id);
-        _logger.LogInformation($"Token belleğe eklendi: Token={verificationToken}, UserId={user.Id}");
+        // Email doğrulama token'ı oluştur ve veritabanına kaydet (restart-safe)
+        var verificationToken = Guid.NewGuid().ToString("N"); // 32 hex karakter, URL-safe
+        var tokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(verificationToken))).ToLowerInvariant();
+
+        // Kullanıcının önceki doğrulanmamış token'larını temizle
+        var oldTokens = _context.EmailVerificationTokens.Where(t => t.UserId == user.Id);
+        _context.EmailVerificationTokens.RemoveRange(oldTokens);
+
+        _context.EmailVerificationTokens.Add(new ApiProject.Models.EmailVerificationToken
+        {
+            UserId = user.Id,
+            TokenHash = tokenHash,
+            ExpiresAt = DateTime.UtcNow.AddHours(24),
+            CreatedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Email doğrulama token'ı DB'ye kaydedildi: UserId={UserId}", user.Id);
 
         // Email doğrulama maili gönder (ZORUNLU - başarısız olursa kayıt iptal edilir)
         try
@@ -352,24 +365,29 @@ public class AuthService : IAuthService
             return true;
         }
 
-        // In-Memory Token Kontrolü
-        if (_verificationTokens.TryGetValue(token, out int storedUserId))
+        // Veritabanı Token Kontrolü (restart-safe, load balancer uyumlu)
+        var tokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+
+        var tokenRecord = await _context.EmailVerificationTokens
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.ExpiresAt > DateTime.UtcNow);
+
+        if (tokenRecord == null)
         {
-            if (storedUserId != userId)
-            {
-                _logger.LogWarning($"Token userId uyuşmazlığı: TokenUserId={storedUserId}, RequestUserId={userId}");
-                return false;
-            }
-            // Başarılı, tokenı sil
-            _verificationTokens.TryRemove(token, out _);
+            _logger.LogWarning("Email doğrulama: token DB'de bulunamadı veya süresi dolmuş. UserId={UserId}", userId);
+            return false;
         }
-        else
+
+        if (tokenRecord.UserId != userId)
         {
-             // Eğer token bellekte yoksa, belki daha önce veritabanına kaydedilmiş eski bir tokendir (Geriye uyumluluk için bakılabilir ama şu anki yapıda LoginType null)
-             // Veya sunucu yeniden başlatılmıştır.
-             _logger.LogWarning($"Token bellekte bulunamadı: {token}");
-             return false;
+            _logger.LogWarning("Token userId uyuşmazlığı: TokenUserId={TokenUserId}, RequestUserId={RequestUserId}",
+                tokenRecord.UserId, userId);
+            return false;
         }
+
+        // Tek kullanımlık — token'ı sil
+        _context.EmailVerificationTokens.Remove(tokenRecord);
+        await _context.SaveChangesAsync();
 
         // LoginType'ı "school_email" olarak güncelle (Ham SQL ile - PostgreSQL ENUM tipi için)
         try

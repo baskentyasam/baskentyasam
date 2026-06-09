@@ -181,6 +181,10 @@ export const updateCafeteriaMenuItem = async (cafeteriaId: number, menuItemId: n
   return res.data;
 };
 
+export const deleteCafeteriaMenuItem = async (cafeteriaId: number, menuItemId: number) => {
+  await apiClient.delete(`/admin/cafeterias/${cafeteriaId}/menu-items/${menuItemId}`);
+};
+
 export const getCafeteriaOrders = async (cafeteriaId: number) => {
   const res = await apiClient.get<OrderResponse[]>(`/admin/cafeterias/${cafeteriaId}/orders`);
   return res.data;

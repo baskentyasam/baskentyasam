@@ -168,7 +168,7 @@ function App() {
 
           element={
 
-            <ProtectedAdminRoute scopedModule="appointment">
+            <ProtectedAdminRoute requireSuperAdmin>
 
               <AdminAppointmentsPage />
 

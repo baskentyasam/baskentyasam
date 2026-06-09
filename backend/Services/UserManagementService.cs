@@ -272,6 +272,11 @@ public class UserManagementService : IUserManagementService
         var scopeKey = dto.ScopeKey.Trim();
         string resolvedScopeDisplayName;
 
+        if (moduleType == AdminModuleType.Appointment)
+        {
+            throw new InvalidOperationException("Randevu modülü yalnızca sistem yöneticisi tarafından yönetilebilir.");
+        }
+
         if (moduleType == AdminModuleType.Cafeteria)
         {
             if (!int.TryParse(scopeKey, out var cafeteriaId) ||
@@ -307,16 +312,6 @@ public class UserManagementService : IUserManagementService
 
             resolvedScopeDisplayName = AdminAssignableScopes.LibraryDisplayName;
             scopeKey = AdminAssignableScopes.LibraryScopeKey;
-        }
-        else if (moduleType == AdminModuleType.Appointment)
-        {
-            if (!scopeKey.Equals(AdminAssignableScopes.AppointmentScopeKey, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("Geçersiz randevu kapsamı.");
-            }
-
-            resolvedScopeDisplayName = AdminAssignableScopes.AppointmentDisplayName;
-            scopeKey = AdminAssignableScopes.AppointmentScopeKey;
         }
         else
         {

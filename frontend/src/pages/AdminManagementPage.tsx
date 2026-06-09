@@ -11,7 +11,7 @@ import {
 
 const AdminManagementPage: React.FC = () => {
   const [list, setList] = useState<SubAdminListItem[]>([]);
-  const [moduleType, setModuleType] = useState<"Cafeteria" | "Parking" | "Library" | "Appointment">("Cafeteria");
+  const [moduleType, setModuleType] = useState<"Cafeteria" | "Parking" | "Library">("Cafeteria");
   const [scopes, setScopes] = useState<AssignableScope[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -37,10 +37,7 @@ const AdminManagementPage: React.FC = () => {
     getAssignableScopes(moduleType)
       .then((s) => {
         setScopes(s);
-        if (
-          s.length === 1 &&
-          (moduleType === "Library" || moduleType === "Appointment")
-        ) {
+        if (s.length === 1 && moduleType === "Library") {
           setForm((f) => ({
             ...f,
             scopeKey: s[0].scopeKey,
@@ -54,8 +51,8 @@ const AdminManagementPage: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (moduleType === "Library" || moduleType === "Appointment") {
-      setError("Kütüphane ve randevu modülleri bu aşamada devre dışıdır.");
+    if (moduleType === "Library") {
+      setError("Kütüphane modülü bu ekrandan henüz atanamaz; kullanıcı yönetiminden rol değiştirin.");
       return;
     }
     try {
@@ -132,7 +129,6 @@ const AdminManagementPage: React.FC = () => {
                 <option value="Cafeteria">Kafeterya</option>
                 <option value="Parking">Otopark</option>
                 <option value="Library">Kütüphane</option>
-                <option value="Appointment">Randevu</option>
               </select>
             </div>
             <div className="md:col-span-2">

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import AdminLayout from "../components/AdminLayout";
 import {
   createCafeteriaMenuItem,
+  deleteCafeteriaMenuItem,
   getCafeteriaDetail,
   getCafeteriaMenuItems,
   getCafeteriaOrders,
@@ -26,7 +27,31 @@ const AdminCafeteriaDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<CafeteriaTab>("menu");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
   const [form, setForm] = useState({ name: "", price: 0, description: "", imageUrl: "", isAvailable: true });
+  const [editingItem, setEditingItem] = useState<MenuItemAdmin | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", price: 0, description: "", imageUrl: "", isAvailable: true });
+  const [deletingItem, setDeletingItem] = useState<MenuItemAdmin | null>(null);
+
+  const emptyForm = { name: "", price: 0, description: "", imageUrl: "", isAvailable: true };
+
+  const openEdit = (item: MenuItemAdmin) => {
+    setActionError("");
+    setEditingItem(item);
+    setEditForm({
+      name: item.name,
+      price: item.price,
+      description: item.description || "",
+      imageUrl: item.imageUrl || "",
+      isAvailable: item.isAvailable,
+    });
+  };
+
+  const closeEdit = () => {
+    setEditingItem(null);
+    setEditForm(emptyForm);
+  };
 
   const load = async () => {
     const [d, m, o] = await Promise.all([
@@ -218,27 +243,206 @@ const AdminCafeteriaDetailPage: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="admin-btn-outline-gray"
-                      onClick={async () => {
-                        await updateCafeteriaMenuItem(id, m.id, {
-                          name: m.name,
-                          price: m.price,
-                          description: m.description,
-                          imageUrl: m.imageUrl,
-                          isAvailable: !m.isAvailable,
-                        });
-                        await load();
-                      }}
-                    >
-                      {m.isAvailable ? "Pasifleştir" : "Aktifleştir"}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="admin-btn-outline-blue"
+                        onClick={() => openEdit(m)}
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn-outline-gray"
+                        onClick={async () => {
+                          setActionError("");
+                          setActionLoading(true);
+                          try {
+                            await updateCafeteriaMenuItem(id, m.id, {
+                              name: m.name,
+                              price: m.price,
+                              description: m.description,
+                              imageUrl: m.imageUrl,
+                              isAvailable: !m.isAvailable,
+                            });
+                            await load();
+                          } catch (err: any) {
+                            setActionError(err?.response?.data?.message || "Durum güncellenemedi.");
+                          } finally {
+                            setActionLoading(false);
+                          }
+                        }}
+                        disabled={actionLoading}
+                      >
+                        {m.isAvailable ? "Pasifleştir" : "Aktifleştir"}
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn-outline-red"
+                        onClick={() => {
+                          setActionError("");
+                          setDeletingItem(m);
+                        }}
+                        disabled={actionLoading}
+                      >
+                        Sil
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
+            {actionError && (
+              <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {actionError}
+              </div>
+            )}
           </section>
+        </div>
+      )}
+
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="admin-card w-full max-w-lg">
+            <div className="admin-card-body">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Menü Ürünü Düzenle</h3>
+                  <p className="mt-1 text-sm text-slate-500">{editingItem.name}</p>
+                </div>
+                <button type="button" className="text-slate-400 hover:text-slate-600" onClick={closeEdit}>
+                  ✕
+                </button>
+              </div>
+
+              <form
+                className="space-y-4"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setActionError("");
+                  setActionLoading(true);
+                  try {
+                    await updateCafeteriaMenuItem(id, editingItem.id, editForm);
+                    closeEdit();
+                    await load();
+                  } catch (err: any) {
+                    setActionError(err?.response?.data?.message || "Ürün güncellenemedi.");
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+              >
+                <div>
+                  <label className="admin-label">Ürün Adı</label>
+                  <input
+                    className="admin-input"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="admin-label">Fiyat (TL)</label>
+                  <input
+                    className="admin-input"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={editForm.price}
+                    onChange={(e) => setEditForm((f) => ({ ...f, price: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="admin-label">Açıklama</label>
+                  <input
+                    className="admin-input"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="admin-label">Görsel URL</label>
+                  <input
+                    className="admin-input"
+                    value={editForm.imageUrl}
+                    onChange={(e) => setEditForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isAvailable}
+                    onChange={(e) => setEditForm((f) => ({ ...f, isAvailable: e.target.checked }))}
+                  />
+                  Satışa uygun
+                </label>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <button type="submit" className="admin-btn-primary" disabled={actionLoading}>
+                    Kaydet
+                  </button>
+                  <button type="button" className="admin-btn-secondary" onClick={closeEdit}>
+                    İptal
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="admin-card w-full max-w-md">
+            <div className="admin-card-body">
+              <h3 className="text-base font-semibold text-slate-900">Ürünü Sil</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                <span className="font-medium text-slate-900">{deletingItem.name}</span> menüden kalıcı olarak silinecek.
+                Bu işlem geri alınamaz.
+              </p>
+              {actionError && (
+                <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {actionError}
+                </div>
+              )}
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="admin-btn-primary bg-red-600 hover:bg-red-700"
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionError("");
+                    setActionLoading(true);
+                    try {
+                      await deleteCafeteriaMenuItem(id, deletingItem.id);
+                      setDeletingItem(null);
+                      await load();
+                    } catch (err: any) {
+                      setActionError(
+                        err?.response?.data?.message ||
+                          "Ürün silinemedi. Sipariş geçmişinde kullanıldıysa pasifleştirmeyi deneyin.",
+                      );
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                >
+                  Evet, Sil
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn-secondary"
+                  onClick={() => {
+                    setDeletingItem(null);
+                    setActionError("");
+                  }}
+                  disabled={actionLoading}
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

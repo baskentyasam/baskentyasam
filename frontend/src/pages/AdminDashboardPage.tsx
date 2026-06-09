@@ -45,12 +45,6 @@ const modules = [
     description: "Öğretim elemanı uygunlukları ve randevu kayıtları",
     available: true,
   },
-  {
-    icon: "⚙️",
-    title: "Sistem Ayarları",
-    description: "Genel sistem yapılandırması",
-    available: false,
-  },
 ];
 
 const AdminDashboardPage: React.FC = () => {

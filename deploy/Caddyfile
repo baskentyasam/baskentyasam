@@ -1,0 +1,9 @@
+# VPS production reverse proxy
+# DOMAIN env degiskeni ile calisir (ornek: baskentyasam.ornek.edu.tr)
+# Caddy otomatik HTTPS (Let's Encrypt) saglar.
+
+{$DOMAIN} {
+	encode gzip
+
+	reverse_proxy web:80
+}

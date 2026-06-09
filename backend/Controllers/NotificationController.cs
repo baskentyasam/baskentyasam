@@ -14,11 +14,13 @@ public class NotificationController : ControllerBase
 {
     private readonly INotificationService _notificationService;
     private readonly ILogger<NotificationController> _logger;
+    private readonly IWebHostEnvironment _environment;
 
-    public NotificationController(INotificationService notificationService, ILogger<NotificationController> logger)
+    public NotificationController(INotificationService notificationService, ILogger<NotificationController> logger, IWebHostEnvironment environment)
     {
         _notificationService = notificationService;
         _logger = logger;
+        _environment = environment;
     }
 
     /// <summary>
@@ -169,11 +171,14 @@ public class NotificationController : ControllerBase
     }
 
     /// <summary>
-    /// Debug endpoint - JWT token'dan user bilgilerini gösterir
+    /// Debug endpoint - yalnızca geliştirme ortamında JWT token bilgilerini gösterir.
     /// </summary>
     [HttpGet("debug")]
     public IActionResult Debug()
     {
+        if (!_environment.IsDevelopment())
+            return NotFound();
+
         var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
         var role = User.FindFirst(ClaimTypes.Role)?.Value;

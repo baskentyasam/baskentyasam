@@ -18,12 +18,14 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly AppDbContext _context;
     private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, AppDbContext context, IWebHostEnvironment environment)
+    public AuthController(IAuthService authService, AppDbContext context, IWebHostEnvironment environment, ILogger<AuthController> logger)
     {
         _authService = authService;
         _context = context;
         _environment = environment;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -265,6 +267,22 @@ public class AuthController : ControllerBase
                 return BadRequest(new { message = "Profil fotoğrafı çok büyük (en fazla ~2.5 MB)." });
             }
 
+            // XSS koruması: Yalnızca güvenli resim formatlarına izin ver (SVG yasak)
+            if (!string.IsNullOrWhiteSpace(dto.ProfileImage))
+            {
+                var allowedPrefixes = new[] {
+                    "data:image/jpeg;base64,",
+                    "data:image/jpg;base64,",
+                    "data:image/png;base64,",
+                    "data:image/webp;base64,",
+                    "data:image/gif;base64,"
+                };
+                if (!allowedPrefixes.Any(p => dto.ProfileImage.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return BadRequest(new { message = "Geçersiz resim formatı. Yalnızca JPEG, PNG, WebP veya GIF kabul edilir." });
+                }
+            }
+
             user.ProfileImage = string.IsNullOrWhiteSpace(dto.ProfileImage) ? null : dto.ProfileImage;
         }
 
@@ -339,7 +357,8 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Profil güncellenirken bir hata oluştu.", error = ex.Message });
+            _logger.LogError(ex, "Profil güncellenirken hata: UserId={UserId}", userId);
+            return StatusCode(500, new { message = "Profil güncellenirken bir hata oluştu." });
         }
     }
 
@@ -375,7 +394,8 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Şifre değişirken bir hata oluştu.", error = ex.Message });
+            _logger.LogError(ex, "Şifre değiştirme hatası: UserId={UserId}", userId);
+            return StatusCode(500, new { message = "Şifre değişirken bir hata oluştu." });
         }
     }
 
@@ -403,7 +423,8 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Kullanıcılar getirilirken bir hata oluştu.", error = ex.Message });
+            _logger.LogError(ex, "Kullanıcılar getirilirken hata");
+            return StatusCode(500, new { message = "Kullanıcılar getirilirken bir hata oluştu." });
         }
     }
 
@@ -724,8 +745,6 @@ public class AuthController : ControllerBase
                 {
                     while (reader.Read())
                     {
-                         // Enum değerini string olarak oku (GetFieldValue<string> veya GetString)
-                         // Postgres enum -> string mapping bazen direkt GetString ile çalışır
                          columns.Add($"ENUM VALUE: {reader.GetValue(0)}");
                     }
                 }

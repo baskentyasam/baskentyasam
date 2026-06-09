@@ -245,10 +245,10 @@ public class CafeService : ICafeService
 
     private static string GenerateOrderNumber()
     {
-        // Basit, okunabilir ve çakışma riski düşük bir sipariş numarası.
-        // Örn: 20260318-143012-4821
+        // Kriptografik rastgele suffix — çakışma riski yok.
+        // Örn: 20260318-143012-A3F2B1C4
         var utcNow = DateTime.UtcNow;
-        var suffix = Random.Shared.Next(1000, 9999);
+        var suffix = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(4));
         return $"{utcNow:yyyyMMdd-HHmmss}-{suffix}";
     }
 }

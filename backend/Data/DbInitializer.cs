@@ -23,6 +23,7 @@ namespace ApiProject.Data
             if (environment.IsDevelopment())
             {
                 SeedDevelopmentUsers(context);
+                EnsureDevelopmentSeedLoginTypes(context);
             }
             else
             {
@@ -162,6 +163,28 @@ namespace ApiProject.Data
             context.Database.ExecuteSqlRaw(
                 "UPDATE users SET login_type = 'school_email'::login_type WHERE email = {0}",
                 "systemadmin@baskentyasam.com");
+        }
+
+        private static void EnsureDevelopmentSeedLoginTypes(AppDbContext context)
+        {
+            var seedEmails = new[]
+            {
+                "ali.ogrenci@baskent.edu.tr",
+                "hoca@baskent.edu.tr",
+                "systemadmin@baskentyasam.com",
+            };
+
+            foreach (var email in seedEmails)
+            {
+                context.Database.ExecuteSqlRaw(
+                    """
+                    UPDATE users
+                    SET login_type = 'school_email'::login_type
+                    WHERE lower(email) = lower({0})
+                      AND login_type IS NULL
+                    """,
+                    email);
+            }
         }
 
         private static void DeactivateLegacyAdmins(AppDbContext context)

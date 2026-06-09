@@ -17,6 +17,7 @@ namespace ApiProject.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<InstructorSchedule> InstructorSchedules { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<EmailVerificationToken> EmailVerificationTokens { get; set; }
         public DbSet<AdminAssignment> AdminAssignments { get; set; }
         public DbSet<Cafeteria> Cafeterias { get; set; }
         public DbSet<ParkingLot> ParkingLots { get; set; }
@@ -39,6 +40,7 @@ namespace ApiProject.Data
             modelBuilder.Entity<Notification>().ToTable("Notifications");
             modelBuilder.Entity<InstructorSchedule>().ToTable("instructor_schedule");
             modelBuilder.Entity<PasswordResetToken>().ToTable("password_reset_tokens");
+            modelBuilder.Entity<EmailVerificationToken>().ToTable("email_verification_tokens");
             modelBuilder.Entity<AdminAssignment>().ToTable("admin_assignments");
             modelBuilder.Entity<Cafeteria>().ToTable("cafeterias");
             modelBuilder.Entity<ParkingLot>().ToTable("parking_lots");
@@ -55,6 +57,20 @@ namespace ApiProject.Data
                 entity.Property(e => e.TokenHash).HasColumnName("token_hash").HasMaxLength(64);
                 entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
                 entity.Property(e => e.UsedAt).HasColumnName("used_at");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => e.TokenHash).IsUnique();
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<EmailVerificationToken>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.UserId).HasColumnName("user_id");
+                entity.Property(e => e.TokenHash).HasColumnName("token_hash").HasMaxLength(64);
+                entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");
                 entity.HasIndex(e => e.TokenHash).IsUnique();
                 entity.HasOne(e => e.User)

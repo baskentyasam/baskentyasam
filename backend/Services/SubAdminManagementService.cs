@@ -52,16 +52,15 @@ public class SubAdminManagementService : ISubAdminManagementService
             }
         }
 
+        if (dto.ModuleType == AdminModuleType.Appointment)
+        {
+            throw new InvalidOperationException("Randevu modülü yalnızca sistem yöneticisi tarafından yönetilebilir.");
+        }
+
         if (dto.ModuleType == AdminModuleType.Library &&
             !dto.ScopeKey.Trim().Equals(AdminAssignableScopes.LibraryScopeKey, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Geçersiz kütüphane kapsamı.");
-        }
-
-        if (dto.ModuleType == AdminModuleType.Appointment &&
-            !dto.ScopeKey.Trim().Equals(AdminAssignableScopes.AppointmentScopeKey, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Geçersiz randevu kapsamı.");
         }
 
         var user = new User
@@ -105,10 +104,6 @@ public class SubAdminManagementService : ISubAdminManagementService
         else if (dto.ModuleType == AdminModuleType.Library)
         {
             resolvedScopeDisplayName = AdminAssignableScopes.LibraryDisplayName;
-        }
-        else if (dto.ModuleType == AdminModuleType.Appointment)
-        {
-            resolvedScopeDisplayName = AdminAssignableScopes.AppointmentDisplayName;
         }
 
         var assignmentToCreate = new AdminAssignment

@@ -106,18 +106,6 @@ public class DirectoryService : IDirectoryService
             ];
         }
 
-        if (moduleType == AdminModuleType.Appointment)
-        {
-            return
-            [
-                new AssignableScopeDto
-                {
-                    ScopeKey = AdminAssignableScopes.AppointmentScopeKey,
-                    ScopeDisplayName = AdminAssignableScopes.AppointmentDisplayName,
-                },
-            ];
-        }
-
         return new List<AssignableScopeDto>();
     }
 

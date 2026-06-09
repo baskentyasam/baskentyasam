@@ -80,7 +80,6 @@ public class OrderController : ControllerBase
     }
 
     [HttpGet("pickup-density")]
-    [AllowAnonymous]
     public async Task<ActionResult<List<PickupTimeDensityDto>>> GetPickupTimeDensity()
     {
         var density = await _cafeService.GetPickupTimeDensityAsync();

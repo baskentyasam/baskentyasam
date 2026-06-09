@@ -21,7 +21,7 @@ import { PASSWORD_POLICY_MESSAGE, validatePassword } from "../utils/passwordPoli
 
 const emptyForm = { name: "", email: "", studentNo: "" };
 
-type ModuleType = "Cafeteria" | "Parking" | "Library" | "Appointment";
+type ModuleType = "Cafeteria" | "Parking" | "Library";
 
 const AdminUsersPage: React.FC = () => {
   const currentUser = getCurrentUser();
@@ -97,7 +97,7 @@ const AdminUsersPage: React.FC = () => {
         setRoleScopes(scopes);
         if (
           scopes.length === 1 &&
-          (roleForm.moduleType === "Library" || roleForm.moduleType === "Appointment")
+          roleForm.moduleType === "Library"
         ) {
           setRoleForm((f) => ({ ...f, scopeKey: scopes[0].scopeKey }));
         }
@@ -133,9 +133,7 @@ const AdminUsersPage: React.FC = () => {
           ? "Parking"
           : detail.subAdminModuleType === "Library"
             ? "Library"
-            : detail.subAdminModuleType === "Appointment"
-              ? "Appointment"
-              : "Cafeteria";
+            : "Cafeteria";
       setRoleForm({
         role: currentRole,
         moduleType,
@@ -583,7 +581,6 @@ const AdminUsersPage: React.FC = () => {
                         <option value="Cafeteria">Kafeterya</option>
                         <option value="Parking">Otopark</option>
                         <option value="Library">Kütüphane</option>
-                        <option value="Appointment">Randevu</option>
                       </select>
                     </div>
                     <div>
@@ -595,10 +592,7 @@ const AdminUsersPage: React.FC = () => {
                           setRoleForm((f) => ({ ...f, scopeKey: e.target.value }))
                         }
                         required
-                        disabled={
-                          roleForm.moduleType === "Library" ||
-                          roleForm.moduleType === "Appointment"
-                        }
+                        disabled={roleForm.moduleType === "Library"}
                       >
                         <option value="">Seçiniz...</option>
                         {roleScopes.map((scope) => (
@@ -610,8 +604,6 @@ const AdminUsersPage: React.FC = () => {
                       <p className="mt-1 text-xs text-slate-500">
                         {roleForm.moduleType === "Library" &&
                           "Kütüphane alt admini tüm kütüphane yönetimini kullanır."}
-                        {roleForm.moduleType === "Appointment" &&
-                          "Randevu alt admini tüm randevu yönetimini kullanır."}
                         {(roleForm.moduleType === "Cafeteria" ||
                           roleForm.moduleType === "Parking") &&
                           "Alt admin yalnızca seçilen kafeterya veya otoparkı yönetebilir."}

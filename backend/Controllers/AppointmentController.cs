@@ -61,7 +61,10 @@ public class AppointmentController : ControllerBase
             // Kullanıcının kendi randevusu olduğunu kontrol et
             var userEmail = GetCurrentUserEmail();
             var userRole = GetCurrentUserRole();
-            if (!string.IsNullOrEmpty(userEmail) && userRole != "Admin")
+            // SuperAdmin ve SubAdmin tüm randevuları görebilir
+            if (!string.IsNullOrEmpty(userEmail)
+                && !string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(userRole, "SubAdmin", StringComparison.OrdinalIgnoreCase))
             {
                 if (appointment.Student?.Email.ToLower() != userEmail.ToLower() && 
                     appointment.Teacher?.Email.ToLower() != userEmail.ToLower())
@@ -476,11 +479,14 @@ public class AppointmentController : ControllerBase
     }
 
     /// <summary>
-    /// Debug endpoint - JWT token'dan user bilgilerini gösterir
+    /// Debug endpoint - yalnızca geliştirme ortamında kullanılır.
     /// </summary>
     [HttpGet("debug")]
     public IActionResult Debug()
     {
+        if (!_environment.IsDevelopment())
+            return NotFound();
+
         var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
         var role = User.FindFirst(ClaimTypes.Role)?.Value;

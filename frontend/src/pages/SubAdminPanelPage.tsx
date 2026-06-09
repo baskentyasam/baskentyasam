@@ -20,8 +20,6 @@ const SubAdminPanelPage: React.FC = () => {
           window.location.href = `/admin/parking/${assignment.scopeKey}`;
         } else if (assignment.moduleType === "Library") {
           window.location.href = "/admin/library";
-        } else if (assignment.moduleType === "Appointment") {
-          window.location.href = "/admin/appointments";
         }
       })
       .catch(() => setError("Atama bilgisi yüklenemedi."));
@@ -51,11 +49,6 @@ const SubAdminPanelPage: React.FC = () => {
             {data.assignment.moduleType === "Library" && (
               <Link className="admin-btn-outline-blue" to="/admin/library">
                 Kütüphane paneline git
-              </Link>
-            )}
-            {data.assignment.moduleType === "Appointment" && (
-              <Link className="admin-btn-outline-blue" to="/admin/appointments">
-                Randevu paneline git
               </Link>
             )}
           </div>
