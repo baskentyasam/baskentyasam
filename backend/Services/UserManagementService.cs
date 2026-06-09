@@ -353,7 +353,7 @@ public class UserManagementService : IUserManagementService
         }
 
         if (Enum.TryParse<UserRole>(role, ignoreCase: true, out var exact) &&
-            exact is UserRole.Student or UserRole.Teacher or UserRole.Staff or UserRole.SuperAdmin or UserRole.SubAdmin)
+            exact is UserRole.Student or UserRole.Teacher or UserRole.Personnel or UserRole.Staff or UserRole.SuperAdmin or UserRole.SubAdmin)
         {
             parsed = exact;
             return true;
@@ -363,6 +363,7 @@ public class UserManagementService : IUserManagementService
         {
             "student" or "öğrenci" => Assign(UserRole.Student, out parsed),
             "teacher" or "instructor" or "öğretim" => Assign(UserRole.Teacher, out parsed),
+            "personnel" or "idari" or "idari personel" => Assign(UserRole.Personnel, out parsed),
             "staff" or "cashier" or "kasiyer" => Assign(UserRole.Staff, out parsed),
             "superadmin" => Assign(UserRole.SuperAdmin, out parsed),
             "subadmin" => Assign(UserRole.SubAdmin, out parsed),

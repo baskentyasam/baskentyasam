@@ -171,7 +171,7 @@ public class AuthService : IAuthService
             throw new InvalidOperationException(passwordError);
         }
 
-        if (registerDto.Role is not UserRole.Student and not UserRole.Teacher)
+        if (registerDto.Role is not UserRole.Student and not UserRole.Teacher and not UserRole.Personnel)
         {
             throw new InvalidOperationException("Bu kayıt tipi desteklenmiyor.");
         }

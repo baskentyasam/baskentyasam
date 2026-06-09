@@ -1,17 +1,32 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { login, register, ApiError } from "../services/authService";
+import {
+  login,
+  register,
+  ApiError,
+  AppRole,
+  RegisterRole,
+} from "../services/authService";
 import { PASSWORD_POLICY_MESSAGE, validatePassword } from "../utils/passwordPolicy";
 
-type AppRole = "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
-
-const inferRegisterRole = (email: string): "student" | "instructor" => {
+const isDigitEmail = (email: string): boolean => {
   const localPart = email.split("@")[0]?.trim() ?? "";
-  return /^\d/.test(localPart) ? "student" : "instructor";
+  return localPart.length > 0 && /^\d/.test(localPart);
+};
+
+const isLetterEmail = (email: string): boolean => {
+  const localPart = email.split("@")[0]?.trim() ?? "";
+  return localPart.length > 0 && /^[a-zA-Z]/.test(localPart);
+};
+
+const getAllowedRegisterRoles = (email: string): RegisterRole[] => {
+  if (isDigitEmail(email)) return ["student"];
+  if (isLetterEmail(email)) return ["instructor", "personnel"];
+  return ["student", "instructor", "personnel"];
 };
 
 const redirectByRole = (navigate: ReturnType<typeof useNavigate>, role: AppRole) => {
-  if (role === "student") {
+  if (role === "student" || role === "personnel") {
     navigate("/ogrenci", { replace: true });
   } else if (role === "instructor") {
     navigate("/ogretim-elemani", { replace: true });
@@ -26,6 +41,12 @@ const redirectByRole = (navigate: ReturnType<typeof useNavigate>, role: AppRole)
   }
 };
 
+const ROLE_OPTIONS: { value: RegisterRole; label: string }[] = [
+  { value: "student", label: "Öğrenci" },
+  { value: "instructor", label: "Öğretim Elemanı" },
+  { value: "personnel", label: "İdari Personel" },
+];
+
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -34,6 +55,7 @@ const LoginPage: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [registerRole, setRegisterRole] = useState<RegisterRole>("student");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [showError, setShowError] = useState(false);
@@ -41,11 +63,21 @@ const LoginPage: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
 
+  const allowedRegisterRoles = useMemo(() => getAllowedRegisterRoles(email.trim()), [email]);
+
   const resetSignupFields = () => {
     setFirstName("");
     setLastName("");
     setEmail("");
+    setRegisterRole("student");
   };
+
+  useEffect(() => {
+    if (!isSignup) return;
+    if (!allowedRegisterRoles.includes(registerRole)) {
+      setRegisterRole(allowedRegisterRoles[0]);
+    }
+  }, [allowedRegisterRoles, registerRole, isSignup]);
 
   useEffect(() => {
     if (error) {
@@ -111,7 +143,10 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      const registerRole = inferRegisterRole(trimmedEmail);
+      if (!allowedRegisterRoles.includes(registerRole)) {
+        setError("Seçtiğiniz hesap türü bu e-posta adresi için uygun değil.");
+        return;
+      }
 
       const response = await register({
         firstName: trimmedFirstName,
@@ -235,6 +270,38 @@ const LoginPage: React.FC = () => {
               className="border rounded-lg px-4 py-2"
               required
             />
+
+            <fieldset className="rounded-lg border border-slate-200 p-3">
+              <legend className="px-1 text-sm font-medium text-slate-700">Hesap Türü</legend>
+              <div className="space-y-2">
+                {ROLE_OPTIONS.map((option) => {
+                  const enabled = allowedRegisterRoles.includes(option.value);
+                  return (
+                    <label
+                      key={option.value}
+                      className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${
+                        enabled
+                          ? registerRole === option.value
+                            ? "border-[#d71920] bg-red-50"
+                            : "border-slate-200 cursor-pointer"
+                          : "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="registerRole"
+                        value={option.value}
+                        checked={registerRole === option.value}
+                        disabled={!enabled}
+                        onChange={() => setRegisterRole(option.value)}
+                        className="mt-1"
+                      />
+                      <span className="text-sm font-medium text-slate-900">{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
           </>
         ) : (
           <input

@@ -56,12 +56,16 @@ public class AuthController : ControllerBase
             {
                 if (registerDto.Role != UserRole.Student)
                 {
-                    return BadRequest(new { message = "Öğrenci e-posta adresleri yalnızca öğrenci olarak kayıt olabilir." });
+                    return BadRequest(new { message = "Rakamla başlayan e-posta adresleri yalnızca öğrenci olarak kayıt olabilir." });
                 }
             }
             else if (registerDto.Role == UserRole.Student)
             {
-                return BadRequest(new { message = "Akademik personel e-posta adresleri öğrenci olarak kayıt olamaz." });
+                return BadRequest(new { message = "Harfle başlayan e-posta adresleri öğrenci olarak kayıt olamaz." });
+            }
+            else if (registerDto.Role is not UserRole.Teacher and not UserRole.Personnel)
+            {
+                return BadRequest(new { message = "Harfle başlayan e-posta adresleri öğretim elemanı veya idari personel olarak kayıt olabilir." });
             }
         }
 

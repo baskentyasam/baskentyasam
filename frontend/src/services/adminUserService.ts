@@ -31,6 +31,7 @@ export type UserRoleFilter =
   | ""
   | "Student"
   | "Teacher"
+  | "Personnel"
   | "Staff"
   | "SuperAdmin"
   | "SubAdmin";
@@ -40,6 +41,7 @@ export type UserStatusFilter = "all" | "active" | "inactive";
 export type AssignableAdminRole =
   | "Student"
   | "Teacher"
+  | "Personnel"
   | "Staff"
   | "SuperAdmin"
   | "SubAdmin";
@@ -47,7 +49,8 @@ export type AssignableAdminRole =
 export const ASSIGNABLE_ROLE_OPTIONS: { value: AssignableAdminRole; label: string }[] = [
   { value: "Student", label: "Öğrenci" },
   { value: "Teacher", label: "Öğretim Elemanı" },
-  { value: "Staff", label: "Kasiyer / Personel" },
+  { value: "Personnel", label: "İdari Personel" },
+  { value: "Staff", label: "Kasiyer" },
   { value: "SuperAdmin", label: "Admin Sistem Yöneticisi" },
   { value: "SubAdmin", label: "Alt Admin" },
 ];
@@ -97,7 +100,8 @@ export const ROLE_FILTER_OPTIONS: { value: UserRoleFilter; label: string }[] = [
   { value: "", label: "Tüm roller" },
   { value: "Student", label: "Öğrenci" },
   { value: "Teacher", label: "Öğretim Elemanı" },
-  { value: "Staff", label: "Kasiyer / Personel" },
+  { value: "Personnel", label: "İdari Personel" },
+  { value: "Staff", label: "Kasiyer" },
   { value: "SuperAdmin", label: "Admin Sistem Yöneticisi" },
   { value: "SubAdmin", label: "Alt Admin" },
 ];

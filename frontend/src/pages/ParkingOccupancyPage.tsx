@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import OccupancyCharts from "../components/OccupancyCharts";
 import { useLiveOccupancyFeed } from "../hooks/useLiveOccupancyFeed";
-import { getCurrentUser } from "../services/authService";
+import { getCurrentUser, isCampusUser } from "../services/authService";
 import {
   ActiveParkingLot,
   getActiveParkingLots,
@@ -13,7 +13,7 @@ import { buildCompareRates, trackOccupancyHistory } from "../utils/occupancyHist
 
 const ParkingOccupancyPage: React.FC = () => {
   const user = getCurrentUser();
-  const isStudent = user?.role === "student";
+  const isCampus = isCampusUser(user?.role);
 
   const loadLots = useCallback(() => getActiveParkingLots(), []);
   const serializeLots = useCallback(
@@ -94,10 +94,10 @@ const ParkingOccupancyPage: React.FC = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-6">
           <h1 className="text-2xl font-semibold">Otopark Doluluk Oranı</h1>
           <Link
-            to={isStudent ? "/ogrenci" : "/ogretim-elemani"}
+            to={isCampus ? "/ogrenci" : "/ogretim-elemani"}
             className="text-sm underline hover:opacity-90"
           >
-            {isStudent ? "Öğrenci anasayfasına dön" : "Öğretim elemanı anasayfasına dön"}
+            {isCampus ? "Anasayfaya dön" : "Öğretim elemanı anasayfasına dön"}
           </Link>
         </div>
       </header>

@@ -35,6 +35,11 @@ namespace ApiProject.Data
             EnsureCafeteria(context, "Sanat Kafe", "Mühendislik/Sanat Yerleşkesi", "Sanat ve mühendislik bölgesine hizmet veren kafe.");
             EnsureCafeteria(context, "Hazırlık Kafe", "Hazırlık Binası", "Hazırlık öğrencilerine yakın kafe.");
 
+            if (environment.IsDevelopment())
+            {
+                SeedDevelopmentCafeteriaSubAdmins(context);
+            }
+
             // 3. OTOPARK SEED (idempotent)
             EnsureParkingLot(context, "Hazırlık Otopark", "Hazırlık Binası Girişi", 250, 90);
             EnsureParkingLot(context, "Mühendislik Otopark", "Mühendislik Fakültesi", 300, 110);
@@ -98,30 +103,26 @@ namespace ApiProject.Data
 
         private static void SeedDevelopmentUsers(AppDbContext context)
         {
-            if (!context.Users.Any())
-            {
-                var student = new User
-                {
-                    Name = "Ali Ogrenci",
-                    Email = "ali.ogrenci@baskent.edu.tr",
-                    Role = UserRole.Student,
-                    StudentNo = "20231001",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("baskent123"),
-                    IsActive = true
-                };
-
-                var teacher = new User
-                {
-                    Name = "Mehmet Hoca",
-                    Email = "hoca@baskent.edu.tr",
-                    Role = UserRole.Teacher,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("baskent123"),
-                    IsActive = true
-                };
-
-                context.Users.AddRange(student, teacher);
-                context.SaveChanges();
-            }
+            // Idempotent: veritabanında başka kullanıcılar olsa bile eksik demo hesaplar eklenir.
+            EnsureDevelopmentSeedUser(
+                context,
+                email: "22194301@baskent.edu.tr",
+                name: "Ali Öğrenci",
+                role: UserRole.Student,
+                password: "baskent123",
+                studentNo: "22194301");
+            EnsureDevelopmentSeedUser(
+                context,
+                email: "hoca@baskent.edu.tr",
+                name: "Mehmet Hoca",
+                role: UserRole.Teacher,
+                password: "baskent123");
+            EnsureDevelopmentSeedUser(
+                context,
+                email: "personel@baskent.edu.tr",
+                name: "Ayşe Personel",
+                role: UserRole.Personnel,
+                password: "baskent123");
 
             if (!context.Users.Any(u => u.Name.ToLower().Trim() == "kasiyer"))
             {
@@ -165,12 +166,187 @@ namespace ApiProject.Data
                 "systemadmin@baskentyasam.com");
         }
 
+        private static void EnsureDevelopmentSeedUser(
+            AppDbContext context,
+            string email,
+            string name,
+            UserRole role,
+            string password,
+            string? studentNo = null)
+        {
+            var normalizedEmail = email.ToLower().Trim();
+            var user = context.Users.FirstOrDefault(u => u.Email.ToLower() == normalizedEmail);
+            if (user == null)
+            {
+                context.Users.Add(new User
+                {
+                    Name = name,
+                    Email = email,
+                    Role = role,
+                    StudentNo = studentNo,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    IsActive = true,
+                });
+                context.SaveChanges();
+                return;
+            }
+
+            var changed = false;
+            if (!user.IsActive)
+            {
+                user.IsActive = true;
+                changed = true;
+            }
+
+            if (user.Role != role)
+            {
+                user.Role = role;
+                changed = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(studentNo) && user.StudentNo != studentNo)
+            {
+                user.StudentNo = studentNo;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                context.SaveChanges();
+            }
+        }
+
+        private static void SeedDevelopmentCafeteriaSubAdmins(AppDbContext context)
+        {
+            EnsureDevelopmentCafeteriaSubAdmin(
+                context,
+                email: "pergel.altadmin@baskent.edu.tr",
+                name: "Pergel Alt Admin",
+                password: "baskent123",
+                cafeteriaName: "Pergel Kafe");
+            EnsureDevelopmentCafeteriaSubAdmin(
+                context,
+                email: "sanat.altadmin@baskent.edu.tr",
+                name: "Sanat Alt Admin",
+                password: "baskent123",
+                cafeteriaName: "Sanat Kafe");
+        }
+
+        private static void EnsureDevelopmentCafeteriaSubAdmin(
+            AppDbContext context,
+            string email,
+            string name,
+            string password,
+            string cafeteriaName)
+        {
+            var cafeteria = context.Cafeterias.FirstOrDefault(c => c.Name == cafeteriaName && c.IsActive);
+            if (cafeteria == null)
+            {
+                return;
+            }
+
+            var createdById = context.Users
+                .Where(u => u.Role == UserRole.SuperAdmin && u.IsActive)
+                .Select(u => u.Id)
+                .FirstOrDefault();
+            if (createdById == 0)
+            {
+                createdById = context.Users.Select(u => u.Id).FirstOrDefault();
+            }
+
+            if (createdById == 0)
+            {
+                return;
+            }
+
+            var normalizedEmail = email.ToLower().Trim();
+            var scopeKey = cafeteria.Id.ToString();
+
+            var user = context.Users.FirstOrDefault(u => u.Email.ToLower() == normalizedEmail);
+            if (user == null)
+            {
+                user = new User
+                {
+                    Name = name,
+                    Email = email,
+                    Role = UserRole.SubAdmin,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    IsActive = true,
+                };
+                context.Users.Add(user);
+                context.SaveChanges();
+            }
+            else
+            {
+                var changed = false;
+                if (user.Role != UserRole.SubAdmin)
+                {
+                    user.Role = UserRole.SubAdmin;
+                    changed = true;
+                }
+
+                if (!user.IsActive)
+                {
+                    user.IsActive = true;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    context.SaveChanges();
+                }
+            }
+
+            var assignments = context.AdminAssignments.Where(a => a.UserId == user.Id).ToList();
+            var targetAssignment = assignments.FirstOrDefault(a =>
+                a.ModuleType == AdminModuleType.Cafeteria && a.ScopeKey == scopeKey);
+
+            if (targetAssignment == null)
+            {
+                foreach (var assignment in assignments.Where(a => a.IsActive))
+                {
+                    assignment.IsActive = false;
+                }
+
+                context.AdminAssignments.Add(new AdminAssignment
+                {
+                    UserId = user.Id,
+                    ModuleType = AdminModuleType.Cafeteria,
+                    ScopeKey = scopeKey,
+                    ScopeDisplayName = cafeteria.Name,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByUserId = createdById,
+                });
+                context.SaveChanges();
+            }
+            else
+            {
+                targetAssignment.IsActive = true;
+                targetAssignment.ScopeDisplayName = cafeteria.Name;
+
+                foreach (var assignment in assignments.Where(a => a.Id != targetAssignment.Id && a.IsActive))
+                {
+                    assignment.IsActive = false;
+                }
+
+                context.SaveChanges();
+            }
+
+            context.Database.ExecuteSqlRaw(
+                "UPDATE users SET login_type = 'school_email'::login_type WHERE id = {0}",
+                user.Id);
+        }
+
         private static void EnsureDevelopmentSeedLoginTypes(AppDbContext context)
         {
             var seedEmails = new[]
             {
-                "ali.ogrenci@baskent.edu.tr",
+                "22194301@baskent.edu.tr",
                 "hoca@baskent.edu.tr",
+                "personel@baskent.edu.tr",
+                "pergel.altadmin@baskent.edu.tr",
+                "sanat.altadmin@baskent.edu.tr",
                 "systemadmin@baskentyasam.com",
             };
 
@@ -519,6 +695,7 @@ namespace ApiProject.Data
 
                 InsertRoleIfMissing(connection, idColumn, nameColumn, 5, "SuperAdmin");
                 InsertRoleIfMissing(connection, idColumn, nameColumn, 6, "SubAdmin");
+                InsertRoleIfMissing(connection, idColumn, nameColumn, 7, "Personnel");
             }
             finally
             {

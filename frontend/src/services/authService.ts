@@ -1,9 +1,12 @@
 import apiClient from '../api/axios';
 
+export type AppRole = "student" | "instructor" | "personnel" | "cashier" | "superadmin" | "subadmin";
+export type RegisterRole = "student" | "instructor" | "personnel";
+
 export interface LoginRequest {
   username: string;
   password: string;
-  role?: "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
+  role?: AppRole;
 }
 
 // Backend'den gelen response formatı
@@ -20,7 +23,7 @@ export interface LoginResponse {
   user: {
     id: string;
     username: string;
-    role: "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
+    role: AppRole;
     name?: string;
   };
 }
@@ -35,8 +38,46 @@ export interface RegisterRequest {
   lastName: string;
   email: string;
   password: string;
-  role: 'student' | 'instructor';
+  role: RegisterRole;
 }
+
+const normalizeBackendRole = (role: string): AppRole => {
+  const roleLower = (role || "").toLowerCase();
+
+  if (roleLower === "teacher" || roleLower === "instructor") {
+    return "instructor";
+  }
+  if (roleLower === "personnel") {
+    return "personnel";
+  }
+  if (roleLower === "staff") {
+    return "cashier";
+  }
+  if (roleLower === "superadmin") {
+    return "superadmin";
+  }
+  if (roleLower === "subadmin") {
+    return "subadmin";
+  }
+  if (roleLower === "admin") {
+    throw {
+      message:
+        "Legacy Admin hesabı devre dışıdır. Lütfen Admin Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
+      status: 403,
+    } as ApiError;
+  }
+
+  return "student";
+};
+
+const mapRegisterRoleToBackend = (role: RegisterRole): string => {
+  if (role === "instructor") return "Teacher";
+  if (role === "personnel") return "Personnel";
+  return "Student";
+};
+
+export const isCampusUser = (role?: string): boolean =>
+  role === "student" || role === "personnel";
 
 // Login işlemi
 export const login = async (credentials: LoginRequest): Promise<LoginResponse> => {
@@ -53,27 +94,7 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
     // Backend'den gelen response'u frontend formatına dönüştür
     const backendData = response.data;
 
-    // Role'ü küçük harfe çevir ve normalize et
-    const roleLower = (backendData.role || "").toLowerCase();
-    let normalizedRole: "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
-
-    if (roleLower === "teacher" || roleLower === "instructor") {
-      normalizedRole = "instructor";
-    } else if (roleLower === "staff") {
-      normalizedRole = "cashier";
-    } else if (roleLower === "superadmin") {
-      normalizedRole = "superadmin";
-    } else if (roleLower === "subadmin") {
-      normalizedRole = "subadmin";
-    } else if (roleLower === "admin") {
-      throw {
-        message:
-          "Legacy Admin hesabı devre dışıdır. Lütfen Admin Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
-        status: 403,
-      } as ApiError;
-    } else {
-      normalizedRole = "student";
-    }
+    const normalizedRole = normalizeBackendRole(backendData.role);
 
     // Frontend formatına dönüştür
     const loginResponse: LoginResponse = {
@@ -129,33 +150,13 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
       lastName: payload.lastName.trim(),
       email: payload.email.trim(),
       password: payload.password,
-      role: payload.role === 'instructor' ? 'Teacher' : 'Student',
+      role: mapRegisterRoleToBackend(payload.role),
     };
 
     const response = await apiClient.post<BackendLoginResponse>('/Auth/register', requestBody);
     const backendData = response.data;
 
-    // Role'ü küçük harfe çevir ve normalize et
-    const roleLower = (backendData.role || "").toLowerCase();
-    let normalizedRole: "student" | "instructor" | "cashier" | "superadmin" | "subadmin";
-
-    if (roleLower === "teacher" || roleLower === "instructor") {
-      normalizedRole = "instructor";
-    } else if (roleLower === "staff") {
-      normalizedRole = "cashier";
-    } else if (roleLower === "superadmin") {
-      normalizedRole = "superadmin";
-    } else if (roleLower === "subadmin") {
-      normalizedRole = "subadmin";
-    } else if (roleLower === "admin") {
-      throw {
-        message:
-          "Legacy Admin hesabı devre dışıdır. Lütfen Admin Sistem Yöneticisi veya Alt Admin hesabı kullanın.",
-        status: 403,
-      } as ApiError;
-    } else {
-      normalizedRole = "student";
-    }
+    const normalizedRole = normalizeBackendRole(backendData.role);
 
     const loginResponse: LoginResponse = {
       token: backendData.token,
@@ -211,14 +212,13 @@ export const getCurrentUser = () => {
   return null;
 };
 
-export const getRoleDisplayName = (
-  role?: "student" | "instructor" | "cashier" | "superadmin" | "subadmin"
-): string => {
+export const getRoleDisplayName = (role?: AppRole): string => {
   if (!role) return "Kullanıcı";
   if (role === "superadmin") return "Admin Sistem Yöneticisi";
   if (role === "subadmin") return "Alt Admin";
   if (role === "cashier") return "Kasiyer";
-  if (role === "instructor") return "Akademik Personel";
+  if (role === "instructor") return "Öğretim Elemanı";
+  if (role === "personnel") return "İdari Personel";
   return "Öğrenci";
 };
 

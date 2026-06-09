@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getCurrentUser } from "../services/authService";
+import { getCurrentUser, isCampusUser } from "../services/authService";
 import { getMyOrders, getOrderStatusText, OrderResponseDto } from "../services/orderService";
 
 const MyOrdersPage: React.FC = () => {
   const user = getCurrentUser();
-  const isStudent = user?.role === "student";
+  const isCampus = isCampusUser(user?.role);
 
   const [orders, setOrders] = useState<OrderResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,8 +13,8 @@ const MyOrdersPage: React.FC = () => {
 
   const homePath = useMemo(() => {
     if (user?.role === "cashier") return "/kasiyer/siparisler";
-    return isStudent ? "/ogrenci" : "/ogretim-elemani";
-  }, [isStudent, user?.role]);
+    return isCampus ? "/ogrenci" : "/ogretim-elemani";
+  }, [isCampus, user?.role]);
 
   useEffect(() => {
     let mounted = true;

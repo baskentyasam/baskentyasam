@@ -114,7 +114,9 @@ public class CafeService : ICafeService
         var order = new Order
         {
             UserId = userId,
-            UserType = user.Role == UserRole.Student ? OrderUserType.Student : OrderUserType.Staff,
+            UserType = user.Role is UserRole.Student or UserRole.Personnel
+                ? OrderUserType.Student
+                : OrderUserType.Staff,
             CreatedAt = DateTime.UtcNow,
             OrderNumber = GenerateOrderNumber(),
             Status = OrderStatus.Received,

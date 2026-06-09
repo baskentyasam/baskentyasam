@@ -30,6 +30,7 @@ public class LoginDto
             {
                 "teacher" or "instructor" => UserRole.Teacher,
                 "student" => UserRole.Student,
+                "personnel" or "idari" => UserRole.Personnel,
                 "staff" => UserRole.Staff,
                 "superadmin" => UserRole.SuperAdmin,
                 "subadmin" => UserRole.SubAdmin,

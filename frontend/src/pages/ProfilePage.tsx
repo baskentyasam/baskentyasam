@@ -88,8 +88,8 @@ const ProfilePage: React.FC = () => {
 
   const dashboardPath = useMemo(() => {
     const r = (localUser?.role || "").toLowerCase();
-    if (r === "student") return "/ogrenci";
-    if (r === "cashier" || r === "staff") return "/kasiyer";
+    if (r === "student" || r === "personnel") return "/ogrenci";
+    if (r === "cashier" || r === "staff") return "/kasiyer/siparisler";
     return "/ogretim-elemani";
   }, [localUser?.role]);
 

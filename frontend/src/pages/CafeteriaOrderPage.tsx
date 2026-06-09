@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getCurrentUser } from "../services/authService";
+import { getCurrentUser, isCampusUser } from "../services/authService";
 import {
   getActiveCafeterias,
   getMenuByCafeteria,
@@ -185,7 +185,7 @@ function mapOrderResponse(order: OrderResponse): PastOrder {
 
 const CafeteriaOrderPage: React.FC = () => {
   const user = getCurrentUser();
-  const isStudent = user?.role === "student";
+  const isCampus = isCampusUser(user?.role);
 
   const [activeCafeterias, setActiveCafeterias] = useState<ActiveCafeteria[]>([]);
   const [cafeteriaListLoading, setCafeteriaListLoading] = useState(true);
@@ -602,11 +602,11 @@ const CafeteriaOrderPage: React.FC = () => {
             </div>
 
             <Link
-              to={isStudent ? "/ogrenci" : "/ogretim-elemani"}
+              to={isCampus ? "/ogrenci" : "/ogretim-elemani"}
               className="text-sm underline hover:opacity-90 text-center sm:text-left whitespace-nowrap"
             >
-              {isStudent
-                ? "Öğrenci anasayfasına dön"
+              {isCampus
+                ? "Anasayfaya dön"
                 : "Öğretim elemanı anasayfasına dön"}
             </Link>
           </div>

@@ -78,5 +78,6 @@ public enum UserRole
     Staff = 2,
     Admin = 3,
     SuperAdmin = 4,
-    SubAdmin = 5
+    SubAdmin = 5,
+    Personnel = 6
 }

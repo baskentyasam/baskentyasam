@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { logout, getCurrentUser } from "../services/authService";
+import { logout, getCurrentUser, getRoleDisplayName } from "../services/authService";
 import NotificationBell from "../components/NotificationBell";
 import ProfileButton from "../components/ProfileButton";
 
@@ -37,9 +37,11 @@ const StudentDashboard: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="w-full border-b bg-[#d71920] text-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
-          <h1 className="text-2xl font-semibold">Başkent Yaşam – Öğrenci</h1>
+          <h1 className="text-2xl font-semibold">
+            Başkent Yaşam – {getRoleDisplayName(user?.role)}
+          </h1>
           <div className="flex items-center gap-4 text-base">
-            <span>Hoş Geldiniz, {user?.name || "Öğrenci"}</span>
+            <span>Hoş Geldiniz, {user?.name || getRoleDisplayName(user?.role)}</span>
             <NotificationBell />
             <ProfileButton />
             <button

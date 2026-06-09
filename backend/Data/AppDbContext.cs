@@ -84,7 +84,7 @@ namespace ApiProject.Data
             {
                 entity.Property(e => e.Id).HasColumnName("id");
                 // role_id kolonu integer - enum ile eşleme: DB'de (int)enum + 1
-                // Student=0→1, Teacher=1→2, Staff=2→3, Admin=3→4, SuperAdmin=4→5, SubAdmin=5→6
+                // Student=0→1, Teacher=1→2, Staff=2→3, Admin=3→4, SuperAdmin=4→5, SubAdmin=5→6, Personnel=6→7
                 // Bazı eski DB'lerde roles lookup tablosu + FK olabilir; DbInitializer idempotent 5/6 ekler.
                 entity.Property(e => e.Role)
                     .HasColumnName("role_id")

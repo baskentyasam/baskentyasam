@@ -10,7 +10,8 @@ public static class UserRoleDisplayHelper
         {
             UserRole.Student => "Öğrenci",
             UserRole.Teacher => "Öğretim Elemanı",
-            UserRole.Staff => "Kasiyer / Personel",
+            UserRole.Personnel => "İdari Personel",
+            UserRole.Staff => "Kasiyer",
             UserRole.SuperAdmin => "Admin Sistem Yöneticisi",
             UserRole.SubAdmin => "Alt Admin",
             UserRole.Admin => "Legacy / Pasif Eski Rol",
@@ -36,6 +37,7 @@ public static class UserRoleDisplayHelper
         {
             "student" or "öğrenci" => Assign(UserRole.Student, out parsed),
             "teacher" or "instructor" or "öğretim" => Assign(UserRole.Teacher, out parsed),
+            "personnel" or "idari" or "idari personel" => Assign(UserRole.Personnel, out parsed),
             "staff" or "cashier" or "kasiyer" => Assign(UserRole.Staff, out parsed),
             "superadmin" => Assign(UserRole.SuperAdmin, out parsed),
             "subadmin" => Assign(UserRole.SubAdmin, out parsed),

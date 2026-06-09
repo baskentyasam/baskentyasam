@@ -171,8 +171,8 @@ public class AppointmentController : ControllerBase
                 return Unauthorized("Kullanıcı bilgisi bulunamadı");
 
             var userRole = GetCurrentUserRole();
-            if (!string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase))
-                return Forbid("Randevu oluşturma yalnızca öğrenciler içindir.");
+            if (!IsCampusUserRole(userRole))
+                return Forbid("Randevu oluşturma yalnızca öğrenci ve idari personel içindir.");
 
             var appointment = await _appointmentService.CreateAppointmentAsync(dto, currentUserId);
             return CreatedAtAction(nameof(GetAppointmentById), new { id = appointment.Id }, MapToDto(appointment));
@@ -463,7 +463,7 @@ public class AppointmentController : ControllerBase
     private static bool CanModifyAppointment(Models.Appointment appointment, string userEmail, string? userRole)
     {
         var normalizedEmail = userEmail.ToLower();
-        if (string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase))
+        if (IsCampusUserRole(userRole))
             return appointment.Student?.Email.ToLower() == normalizedEmail;
 
         if (string.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase))
@@ -474,8 +474,14 @@ public class AppointmentController : ControllerBase
 
     private static bool CanCancelAppointmentAsOwner(string? userRole)
     {
-        return string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase)
+        return IsCampusUserRole(userRole)
             || string.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCampusUserRole(string? userRole)
+    {
+        return string.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(userRole, "Personnel", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
