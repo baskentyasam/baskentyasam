@@ -649,6 +649,7 @@ public class AuthController : ControllerBase
                     </div>
                 </body>
                 </html>";
+            errorHtml = errorHtml.Replace("{frontendUrl}", frontendUrl);
             return Content(errorHtml, "text/html; charset=utf-8");
         }
 
@@ -687,6 +688,7 @@ public class AuthController : ControllerBase
                     </div>
                 </body>
                 </html>";
+            successHtml = successHtml.Replace("{frontendUrl}", frontendUrl);
             return Content(successHtml, "text/html; charset=utf-8");
         }
         
@@ -725,6 +727,7 @@ public class AuthController : ControllerBase
                 </div>
             </body>
             </html>";
+        failureHtml = failureHtml.Replace("{frontendUrl}", frontendUrl);
         return Content(failureHtml, "text/html; charset=utf-8");
     }
     [HttpGet("debug-schema")]

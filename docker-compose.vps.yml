@@ -58,6 +58,7 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Sistem Yöneticisi}
+      DEVICE_TOKEN: ${DEVICE_TOKEN:-}
     volumes:
       - api_logs:/app/logs
     restart: unless-stopped

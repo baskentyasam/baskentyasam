@@ -20,4 +20,32 @@ public class LibraryOccupancyController : ControllerBase
     {
         return Ok(await _libraryService.GetPublicSnapshotAsync());
     }
+
+    [HttpPost("occupancy/push")]
+    public async Task<IActionResult> PushOccupancy([FromBody] OccupancyPushDto dto)
+    {
+        var expectedToken = Environment.GetEnvironmentVariable("DEVICE_TOKEN");
+        if (string.IsNullOrWhiteSpace(expectedToken))
+        {
+            return StatusCode(503, new { message = "Cihaz entegrasyonu yapılandırılmamış." });
+        }
+
+        var providedToken = Request.Headers["X-Device-Token"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(providedToken) || providedToken != expectedToken)
+        {
+            return Unauthorized(new { message = "Geçersiz cihaz token'ı." });
+        }
+
+        var snapshot = await _libraryService.GetPublicSnapshotAsync();
+        var newOccupancy = Math.Max(0, snapshot.CurrentOccupancy + dto.In - dto.Out);
+        var updated = await _libraryService.UpdateOccupancyAsync(newOccupancy);
+
+        return Ok(new
+        {
+            previousOccupancy = snapshot.CurrentOccupancy,
+            currentOccupancy = updated.CurrentOccupancy,
+            availableSlots = updated.AvailableSlots,
+            occupancyRate = updated.OccupancyRate,
+        });
+    }
 }
