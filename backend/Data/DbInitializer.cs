@@ -16,9 +16,12 @@ namespace ApiProject.Data
             context.Database.EnsureCreated();
 
             EnsureUserProfileFacultyColumn(context);
+            EnsureCameraDeviceTables(context);
 
             EnsureRoleCatalogRecords(context);
             DeactivateLegacyAdmins(context);
+
+            EnsureDefaultCameraDevice(context);
 
             if (environment.IsDevelopment())
             {
@@ -99,6 +102,97 @@ namespace ApiProject.Data
         {
             context.Database.ExecuteSqlRaw(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_faculty text;");
+        }
+
+        private static void EnsureCameraDeviceTables(AppDbContext context)
+        {
+            context.Database.ExecuteSqlRaw(@"
+                CREATE TABLE IF NOT EXISTS devices (
+                    id              varchar(64)  PRIMARY KEY,
+                    name            varchar(200) NOT NULL,
+                    location_type   varchar(20)  NOT NULL,
+                    location_key    varchar(100),
+                    token_hash      varchar(200) NOT NULL,
+                    last_seen_at    timestamp,
+                    is_active       boolean      NOT NULL DEFAULT true,
+                    created_at      timestamp    NOT NULL DEFAULT (now() at time zone 'utc')
+                );
+
+                CREATE TABLE IF NOT EXISTS device_configs (
+                    device_id          varchar(64)  PRIMARY KEY,
+                    line_json          text         NOT NULL DEFAULT '[427,0,427,480]',
+                    mode               varchar(20)  NOT NULL DEFAULT 'person',
+                    flip_direction     boolean      NOT NULL DEFAULT false,
+                    roi_json           text,
+                    config_version     integer      NOT NULL DEFAULT 1,
+                    snapshot_requested boolean      NOT NULL DEFAULT false,
+                    updated_at         timestamp    NOT NULL DEFAULT (now() at time zone 'utc')
+                );
+
+                CREATE TABLE IF NOT EXISTS device_snapshots (
+                    id          serial PRIMARY KEY,
+                    device_id   varchar(64) NOT NULL,
+                    jpeg_data   bytea       NOT NULL,
+                    width       integer     NOT NULL,
+                    height      integer     NOT NULL,
+                    created_at  timestamp   NOT NULL DEFAULT (now() at time zone 'utc')
+                );
+                CREATE INDEX IF NOT EXISTS IX_device_snapshots_device_id_created_at
+                    ON device_snapshots (device_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS occupancy_logs (
+                    id         serial PRIMARY KEY,
+                    zone_name  varchar(100) NOT NULL,
+                    count      integer      NOT NULL,
+                    capacity   integer      NOT NULL,
+                    log_time   timestamp    NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS IX_occupancy_logs_zone_name_log_time
+                    ON occupancy_logs (zone_name, log_time);
+            ");
+        }
+
+        private static void EnsureDefaultCameraDevice(AppDbContext context)
+        {
+            const string deviceId = "library-main";
+            if (context.Devices.Any(d => d.Id == deviceId))
+            {
+                return;
+            }
+
+            // Backward compat: mevcut DEVICE_TOKEN env'i varsa onu hash'leyip kullan.
+            // Bu sayede Pi'daki mevcut .env (eski endpoint için kullanılan token) hâlâ geçerli kalır.
+            var existingToken = Environment.GetEnvironmentVariable("DEVICE_TOKEN");
+            if (string.IsNullOrWhiteSpace(existingToken))
+            {
+                // Token yoksa sessizce atla — admin sonra cihazı manuel oluşturur.
+                return;
+            }
+
+            var device = new Models.Device
+            {
+                Id = deviceId,
+                Name = "Kütüphane Ana Kamera",
+                LocationType = "library",
+                LocationKey = "library-main",
+                TokenHash = BCrypt.Net.BCrypt.HashPassword(existingToken),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+            };
+
+            var config = new Models.DeviceConfig
+            {
+                DeviceId = deviceId,
+                LineJson = "[427,0,427,480]",
+                Mode = "person",
+                FlipDirection = false,
+                ConfigVersion = 1,
+                UpdatedAt = DateTime.UtcNow,
+            };
+
+            context.Devices.Add(device);
+            context.DeviceConfigs.Add(config);
+            context.SaveChanges();
         }
 
         private static void SeedDevelopmentUsers(AppDbContext context)

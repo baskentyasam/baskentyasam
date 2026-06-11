@@ -28,6 +28,7 @@ const AdminLayout: React.FC<Props> = ({ title, children, subtitle }) => {
     { to: "/admin/library", label: "Kütüphane", icon: "📚" },
     { to: "/admin/parking", label: "Otopark", icon: "🅿️" },
     { to: "/admin/appointments", label: "Randevu", icon: "📅" },
+    { to: "/admin/cameras", label: "Kameralar", icon: "📹" },
   ];
 
   const subAdminLinks: NavItem[] = [{ to: "/admin/panel", label: "Panelim", icon: "📋" }];

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../components/AdminLayout";
+import OccupancyChart from "../components/OccupancyChart";
 import {
   LibraryAdminOverview,
   LibraryScheduleMode,
@@ -433,6 +434,10 @@ const AdminLibraryPage: React.FC = () => {
           </button>
         </div>
       </section>
+
+      <div className="mt-6">
+        <OccupancyChart zoneName="library-main" title="Kütüphane Doluluk Grafiği" />
+      </div>
     </AdminLayout>
   );
 };

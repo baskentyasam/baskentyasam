@@ -199,6 +199,8 @@ try
     builder.Services.AddScoped<IUserManagementService, UserManagementService>();
     builder.Services.AddScoped<IAdminAppointmentManagementService, AdminAppointmentManagementService>();
     builder.Services.AddScoped<ScheduleService>();
+    builder.Services.AddScoped<IDeviceService, DeviceService>();
+    builder.Services.AddScoped<IOccupancyLogService, OccupancyLogService>();
 
     // Background Service
     builder.Services.AddHostedService<OrderCleanupService>();

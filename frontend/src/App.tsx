@@ -50,6 +50,10 @@ import AdminLibraryPage from "./pages/AdminLibraryPage";
 
 import AdminLibraryDetailPage from "./pages/AdminLibraryDetailPage";
 
+import AdminCamerasPage from "./pages/AdminCamerasPage";
+
+import AdminCameraConfigPage from "./pages/AdminCameraConfigPage";
+
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import RequireRole from "./components/RequireRole";
 
@@ -263,6 +267,23 @@ function App() {
         <Route path="/kutuphane" element={<LibraryOccupancyPage />} />
         <Route path="/otopark" element={<ParkingOccupancyPage />} />
         <Route path="/profil" element={<ProfilePage />} />
+
+        <Route
+          path="/admin/cameras"
+          element={
+            <ProtectedAdminRoute requireSuperAdmin>
+              <AdminCamerasPage />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/cameras/:deviceId"
+          element={
+            <ProtectedAdminRoute requireSuperAdmin>
+              <AdminCameraConfigPage />
+            </ProtectedAdminRoute>
+          }
+        />
 
       </Routes>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AdminLayout from "../components/AdminLayout";
+import OccupancyChart from "../components/OccupancyChart";
 import { getCurrentUser } from "../services/authService";
 import { getParkingLotDetail, updateParkingLot, updateParkingMetrics } from "../services/adminService";
 
@@ -167,9 +168,9 @@ const AdminParkingDetailPage: React.FC = () => {
         </section>
       )}
 
-      <section className="admin-card admin-card-body mt-6 text-sm text-slate-500">
-        Doluluk logları sonraki aşamada detaylandırılacak.
-      </section>
+      <div className="mt-6">
+        <OccupancyChart zoneName={`parking-${detail.id}`} title="Otopark Doluluk Grafiği" />
+      </div>
     </AdminLayout>
   );
 };

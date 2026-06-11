@@ -26,6 +26,10 @@ namespace ApiProject.Data
         public DbSet<LibraryStatus> LibraryStatuses { get; set; }
         public DbSet<Faculty> Faculties { get; set; }
         public DbSet<Department> Departments { get; set; }
+        public DbSet<Device> Devices { get; set; }
+        public DbSet<DeviceConfig> DeviceConfigs { get; set; }
+        public DbSet<DeviceSnapshot> DeviceSnapshots { get; set; }
+        public DbSet<OccupancyLog> OccupancyLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -49,6 +53,10 @@ namespace ApiProject.Data
             modelBuilder.Entity<LibraryStatus>().ToTable("library_status");
             modelBuilder.Entity<Faculty>().ToTable("faculties");
             modelBuilder.Entity<Department>().ToTable("departments");
+            modelBuilder.Entity<Device>().ToTable("devices");
+            modelBuilder.Entity<DeviceConfig>().ToTable("device_configs");
+            modelBuilder.Entity<DeviceSnapshot>().ToTable("device_snapshots");
+            modelBuilder.Entity<OccupancyLog>().ToTable("occupancy_logs");
 
             modelBuilder.Entity<PasswordResetToken>(entity =>
             {
@@ -254,6 +262,51 @@ namespace ApiProject.Data
                 
                 // RejectionReason kolonu yok, ignore et
                 entity.Ignore(e => e.RejectionReason);
+            });
+
+            modelBuilder.Entity<Device>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id").HasMaxLength(64);
+                entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(200);
+                entity.Property(e => e.LocationType).HasColumnName("location_type").HasMaxLength(20);
+                entity.Property(e => e.LocationKey).HasColumnName("location_key").HasMaxLength(100);
+                entity.Property(e => e.TokenHash).HasColumnName("token_hash").HasMaxLength(200);
+                entity.Property(e => e.LastSeenAt).HasColumnName("last_seen_at");
+                entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            });
+
+            modelBuilder.Entity<DeviceConfig>(entity =>
+            {
+                entity.Property(e => e.DeviceId).HasColumnName("device_id").HasMaxLength(64);
+                entity.Property(e => e.LineJson).HasColumnName("line_json");
+                entity.Property(e => e.Mode).HasColumnName("mode").HasMaxLength(20);
+                entity.Property(e => e.FlipDirection).HasColumnName("flip_direction");
+                entity.Property(e => e.RoiJson).HasColumnName("roi_json");
+                entity.Property(e => e.ConfigVersion).HasColumnName("config_version");
+                entity.Property(e => e.SnapshotRequested).HasColumnName("snapshot_requested");
+                entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+            });
+
+            modelBuilder.Entity<DeviceSnapshot>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.DeviceId).HasColumnName("device_id").HasMaxLength(64);
+                entity.Property(e => e.JpegData).HasColumnName("jpeg_data");
+                entity.Property(e => e.Width).HasColumnName("width");
+                entity.Property(e => e.Height).HasColumnName("height");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.HasIndex(e => new { e.DeviceId, e.CreatedAt });
+            });
+
+            modelBuilder.Entity<OccupancyLog>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.ZoneName).HasColumnName("zone_name").HasMaxLength(100);
+                entity.Property(e => e.Count).HasColumnName("count");
+                entity.Property(e => e.Capacity).HasColumnName("capacity");
+                entity.Property(e => e.LogTime).HasColumnName("log_time");
+                entity.HasIndex(e => new { e.ZoneName, e.LogTime });
             });
 
             // Enum Ayarları
