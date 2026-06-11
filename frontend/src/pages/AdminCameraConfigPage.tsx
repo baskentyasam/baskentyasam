@@ -39,6 +39,9 @@ const AdminCameraConfigPage: React.FC = () => {
   const [snapshotRequestedAt, setSnapshotRequestedAt] = useState<Date | null>(null);
   const [lastSnapshotAt, setLastSnapshotAt] = useState<string | null>(null);
 
+  const [newToken, setNewToken] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragTarget>(null);
@@ -289,6 +292,20 @@ const AdminCameraConfigPage: React.FC = () => {
     }
   };
 
+  const handleRegenerateToken = async () => {
+    if (!window.confirm("Yeni bir token üretilecek ve eski token geçersiz olacak. Pi'daki .env'i güncellemen gerekecek. Devam edilsin mi?")) return;
+    setRegenerating(true);
+    setError("");
+    try {
+      const token = await deviceService.regenerateToken(deviceId);
+      setNewToken(token);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Token üretilemedi.");
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError("");
@@ -380,6 +397,29 @@ const AdminCameraConfigPage: React.FC = () => {
         {success && (
           <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             {success}
+          </div>
+        )}
+
+        {newToken && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <div className="font-semibold text-amber-900">
+              Yeni token üretildi
+            </div>
+            <div className="mt-2 text-sm text-amber-800">
+              Pi'da <code>/home/ahmet/camera_module/.env</code> dosyasındaki <code>DEVICE_TOKEN</code>'ı şununla değiştir:
+            </div>
+            <code className="mt-2 block break-all rounded bg-white p-3 font-mono text-sm">
+              {newToken}
+            </code>
+            <div className="mt-2 text-xs text-amber-700">
+              Sonrasında: <code>sudo systemctl restart camera_module</code>
+            </div>
+            <button
+              className="mt-3 rounded bg-amber-700 px-3 py-1 text-sm text-white hover:bg-amber-800"
+              onClick={() => setNewToken(null)}
+            >
+              Anladım, kapat
+            </button>
           </div>
         )}
 
@@ -518,6 +558,14 @@ const AdminCameraConfigPage: React.FC = () => {
             <p className="text-xs text-slate-500">
               Kaydedince Pi 10 saniye içinde yeni konfigürasyonu çekecek.
             </p>
+
+            <button
+              onClick={handleRegenerateToken}
+              disabled={regenerating}
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              🔑 Token Yeniden Üret
+            </button>
           </div>
         </div>
       </div>

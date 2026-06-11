@@ -197,6 +197,33 @@ export const register = async (payload: RegisterRequest): Promise<LoginResponse>
   }
 };
 
+// Doğrulama e-postasını tekrar gönder
+export const resendVerificationEmail = async (
+  email: string,
+): Promise<{ cooldownSeconds: number; message: string }> => {
+  try {
+    const r = await apiClient.post<{ cooldownSeconds: number; message: string }>(
+      "/Auth/resend-verification",
+      { email },
+    );
+    return r.data;
+  } catch (error: any) {
+    const data = error?.response?.data;
+    const status = error?.response?.status;
+    if (status === 429 && data?.cooldownSeconds) {
+      throw {
+        message: data.message || `Lütfen ${data.cooldownSeconds} saniye bekleyin.`,
+        cooldownSeconds: data.cooldownSeconds,
+        status,
+      } as ApiError & { cooldownSeconds: number };
+    }
+    throw {
+      message: data?.message || "Doğrulama e-postası gönderilemedi.",
+      status,
+    } as ApiError;
+  }
+};
+
 // Logout işlemi
 export const logout = (): void => {
   localStorage.removeItem('token');

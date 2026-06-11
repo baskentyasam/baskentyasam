@@ -21,6 +21,7 @@ public interface IDeviceService
     Task<CreateDeviceResponseDto> CreateAsync(CreateDeviceDto dto);
     Task<DeviceConfigResponseDto> UpdateConfigAsync(string deviceId, DeviceConfigUpdateDto dto);
     Task RequestSnapshotAsync(string deviceId);
+    Task<string?> RegenerateTokenAsync(string deviceId);
 }
 
 public class DeviceService : IDeviceService
@@ -89,21 +90,34 @@ public class DeviceService : IDeviceService
         var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == deviceId);
         if (device == null) return 0;
 
-        // Şimdilik sadece library entegrasyonu var.
         if (device.LocationType == "library")
         {
             var snapshot = await _libraryService.GetPublicSnapshotAsync();
             var newOccupancy = Math.Max(0, snapshot.CurrentOccupancy + delIn - delOut);
+            // LibraryManagementService.UpdateOccupancyAsync log'u kendi yazar.
             var updated = await _libraryService.UpdateOccupancyAsync(newOccupancy);
-
-            // Log yaz (Faz 9 retention/cleanup ayrı handler'da)
-            var zoneName = device.LocationKey ?? device.Id;
-            await _occupancyLogs.AppendAsync(zoneName, updated.CurrentOccupancy, updated.OpenCapacity);
-
             return updated.CurrentOccupancy;
         }
 
-        // location_type "parking" veya "cafeteria" — şimdilik no-op, ileride event router eklenir.
+        if (device.LocationType == "parking")
+        {
+            if (!int.TryParse(device.LocationKey, out var lotId))
+            {
+                _logger.LogWarning("Parking cihaz {DeviceId} LocationKey integer değil: {Key}", deviceId, device.LocationKey);
+                return 0;
+            }
+            var lot = await _context.ParkingLots.FirstOrDefaultAsync(p => p.Id == lotId);
+            if (lot == null) return 0;
+
+            var newOccupancy = Math.Max(0, lot.CurrentOccupancy + delIn - delOut);
+            if (lot.Capacity > 0) newOccupancy = Math.Min(newOccupancy, lot.Capacity);
+            lot.CurrentOccupancy = newOccupancy;
+            await _context.SaveChangesAsync();
+            await _occupancyLogs.AppendAsync($"parking-{lot.Id}", lot.CurrentOccupancy, lot.Capacity);
+            return lot.CurrentOccupancy;
+        }
+
+        // cafeteria veya başka tip — şimdilik no-op.
         return 0;
     }
 
@@ -261,6 +275,16 @@ public class DeviceService : IDeviceService
         config.SnapshotRequested = true;
         config.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<string?> RegenerateTokenAsync(string deviceId)
+    {
+        var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null) return null;
+        var plainToken = GenerateToken();
+        device.TokenHash = BCrypt.Net.BCrypt.HashPassword(plainToken);
+        await _context.SaveChangesAsync();
+        return plainToken;
     }
 
     private async Task<DeviceConfig> EnsureConfigAsync(string deviceId)

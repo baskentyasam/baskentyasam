@@ -64,7 +64,7 @@ public class CreateDeviceDto
 {
     [Required] [MaxLength(64)] public string Id { get; set; } = string.Empty;
     [Required] [MaxLength(200)] public string Name { get; set; } = string.Empty;
-    [Required] [RegularExpression("^(library|parking|cafeteria)$")] public string LocationType { get; set; } = "library";
+    [Required] [RegularExpression("^(library|parking)$")] public string LocationType { get; set; } = "library";
     [MaxLength(100)] public string? LocationKey { get; set; }
 }
 

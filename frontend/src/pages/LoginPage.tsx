@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   login,
   register,
+  resendVerificationEmail,
   ApiError,
   AppRole,
   RegisterRole,
@@ -63,6 +64,12 @@ const LoginPage: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
 
+  // Doğrulama maili tekrar gönderme
+  const [resendEmail, setResendEmail] = useState<string>("");
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+  const [resendLoading, setResendLoading] = useState<boolean>(false);
+  const [resendInfo, setResendInfo] = useState<string>("");
+
   const allowedRegisterRoles = useMemo(() => getAllowedRegisterRoles(email.trim()), [email]);
 
   const resetSignupFields = () => {
@@ -94,6 +101,31 @@ const LoginPage: React.FC = () => {
       setError("");
     }
   }, [success]);
+
+  // Cooldown geri sayım
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
+
+  const handleResendVerification = async () => {
+    if (!resendEmail || resendCooldown > 0 || resendLoading) return;
+    setResendLoading(true);
+    setResendInfo("");
+    try {
+      const r = await resendVerificationEmail(resendEmail);
+      setResendCooldown(r.cooldownSeconds || 60);
+      setResendInfo("Doğrulama e-postası tekrar gönderildi. Lütfen gelen kutunu kontrol et.");
+    } catch (err: any) {
+      if (err?.cooldownSeconds) {
+        setResendCooldown(err.cooldownSeconds);
+      }
+      setResendInfo(err?.message || "Tekrar gönderme başarısız.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,6 +194,9 @@ const LoginPage: React.FC = () => {
         );
         setIsSignup(false);
         setUsername(trimmedEmail);
+        setResendEmail(trimmedEmail);
+        setResendCooldown(60); // İlk kayıt sonrası 60 sn bekle
+        setResendInfo("");
         resetSignupFields();
         setPassword("");
         return;
@@ -212,6 +247,29 @@ const LoginPage: React.FC = () => {
                 <span className="text-xl font-bold leading-none">×</span>
               </button>
             </div>
+
+            {resendEmail && (
+              <div className="mt-3 border-t border-green-200 pt-3">
+                <p className="text-xs text-green-800 mb-2">
+                  Mail gelmediyse tekrar gönderebilirsin (<b>{resendEmail}</b>):
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendCooldown > 0 || resendLoading}
+                  className="text-sm bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded transition-colors"
+                >
+                  {resendLoading
+                    ? "Gönderiliyor..."
+                    : resendCooldown > 0
+                      ? `Tekrar Gönder (${resendCooldown}s)`
+                      : "📧 Tekrar Gönder"}
+                </button>
+                {resendInfo && (
+                  <p className="text-xs text-green-700 mt-2">{resendInfo}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

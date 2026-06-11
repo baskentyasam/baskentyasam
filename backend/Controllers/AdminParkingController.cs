@@ -16,11 +16,16 @@ public class AdminParkingController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IAdminAuthorizationService _adminAuthorizationService;
+    private readonly IOccupancyLogService _occupancyLogs;
 
-    public AdminParkingController(AppDbContext context, IAdminAuthorizationService adminAuthorizationService)
+    public AdminParkingController(
+        AppDbContext context,
+        IAdminAuthorizationService adminAuthorizationService,
+        IOccupancyLogService occupancyLogs)
     {
         _context = context;
         _adminAuthorizationService = adminAuthorizationService;
+        _occupancyLogs = occupancyLogs;
     }
 
     [HttpGet]
@@ -133,6 +138,7 @@ public class AdminParkingController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        await _occupancyLogs.AppendAsync($"parking-{lot.Id}", lot.CurrentOccupancy, lot.Capacity);
         return Ok(lot);
     }
 

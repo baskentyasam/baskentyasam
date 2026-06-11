@@ -25,10 +25,12 @@ public class LibraryManagementService : ILibraryManagementService
     };
 
     private readonly AppDbContext _context;
+    private readonly IOccupancyLogService _occupancyLogs;
 
-    public LibraryManagementService(AppDbContext context)
+    public LibraryManagementService(AppDbContext context, IOccupancyLogService occupancyLogs)
     {
         _context = context;
+        _occupancyLogs = occupancyLogs;
     }
 
     public async Task<LibraryAdminOverviewDto> GetOverviewAsync()
@@ -99,7 +101,12 @@ public class LibraryManagementService : ILibraryManagementService
         await _context.SaveChangesAsync();
 
         var floors = await GetOrderedFloorsAsync();
-        return BuildOverview(floors, status);
+        var overview = BuildOverview(floors, status);
+
+        // Tüm güncellemeler (camera push, manuel admin) tek bir log yoluna düşer
+        await _occupancyLogs.AppendAsync("library-main", overview.CurrentOccupancy, overview.OpenCapacity);
+
+        return overview;
     }
 
     public async Task<LibraryAdminOverviewDto> UpdateScheduleModeAsync(string scheduleMode)

@@ -20,6 +20,8 @@ public interface IAuthService
     Task<AuthResponseDto?> LoginAsync(LoginDto loginDto);
     Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto);
     Task<bool> VerifyEmailAsync(string token, int userId);
+    /// <returns>(success, cooldownSeconds). success=false ise cooldownSeconds dolmadıysa pozitiftir.</returns>
+    Task<(bool Success, int CooldownSeconds)> ResendVerificationEmailAsync(string email);
     string GenerateJwtToken(User user);
     /// <summary>E-posta kayıtlı değilse sessizce çıkar; enumeration riskini azaltmak için.</summary>
     /// <summary>Development + SMTP yoksa sıfırlama bağlantısını döner.</summary>
@@ -300,6 +302,72 @@ public class AuthService : IAuthService
             Role = user.Role.ToString(),
             Message = "Kayıt başarılı! Lütfen email adresinize gelen doğrulama linkine tıklayarak hesabınızı aktifleştirin."
         };
+    }
+
+    public async Task<(bool Success, int CooldownSeconds)> ResendVerificationEmailAsync(string email)
+    {
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalizedEmail))
+        {
+            return (false, 0);
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u =>
+            u.Email.ToLower().Trim() == normalizedEmail);
+
+        // Enumeration'ı önlemek için kullanıcı yoksa da başarılı görünelim.
+        if (user == null)
+        {
+            return (true, 60);
+        }
+        if (user.IsActive == false)
+        {
+            // Hesap zaten aktif (doğrulanmış)? Veya askıya alınmış? Yine sessiz.
+            return (true, 60);
+        }
+
+        const int cooldownSeconds = 60;
+        var lastToken = await _context.EmailVerificationTokens
+            .Where(t => t.UserId == user.Id)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (lastToken != null)
+        {
+            var elapsed = (DateTime.UtcNow - lastToken.CreatedAt).TotalSeconds;
+            if (elapsed < cooldownSeconds)
+            {
+                var wait = (int)Math.Ceiling(cooldownSeconds - elapsed);
+                return (false, wait);
+            }
+        }
+
+        var newToken = Guid.NewGuid().ToString("N");
+        var tokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(newToken))).ToLowerInvariant();
+
+        _context.EmailVerificationTokens.RemoveRange(
+            _context.EmailVerificationTokens.Where(t => t.UserId == user.Id));
+        _context.EmailVerificationTokens.Add(new ApiProject.Models.EmailVerificationToken
+        {
+            UserId = user.Id,
+            TokenHash = tokenHash,
+            ExpiresAt = DateTime.UtcNow.AddHours(24),
+            CreatedAt = DateTime.UtcNow,
+        });
+        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _emailService.SendVerificationEmailAsync(user.Email, user.Name, newToken, user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Tekrar doğrulama maili gönderilemedi: {Email}", user.Email);
+            return (false, cooldownSeconds);
+        }
+
+        return (true, cooldownSeconds);
     }
 
     public string GenerateJwtToken(User user)

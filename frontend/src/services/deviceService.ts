@@ -1,6 +1,6 @@
 import apiClient from "../api/axios";
 
-export type LocationType = "library" | "parking" | "cafeteria";
+export type LocationType = "library" | "parking";
 
 export interface DeviceRoi {
   enabled: boolean;
@@ -81,6 +81,13 @@ export const deviceService = {
 
   requestSnapshot: async (id: string): Promise<void> => {
     await apiClient.post(`/admin/devices/${encodeURIComponent(id)}/snapshot/request`);
+  },
+
+  regenerateToken: async (id: string): Promise<string> => {
+    const r = await apiClient.post<{ plainToken: string }>(
+      `/admin/devices/${encodeURIComponent(id)}/regenerate-token`,
+    );
+    return r.data.plainToken;
   },
 
   // Snapshot binary olarak indirir, blob URL döner

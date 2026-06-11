@@ -11,7 +11,6 @@ import {
 const LOCATION_LABELS: Record<LocationType, string> = {
   library: "Kütüphane",
   parking: "Otopark",
-  cafeteria: "Kafeterya",
 };
 
 const AdminCamerasPage: React.FC = () => {
@@ -145,7 +144,6 @@ const AdminCamerasPage: React.FC = () => {
               >
                 <option value="library">Kütüphane</option>
                 <option value="parking">Otopark</option>
-                <option value="cafeteria">Kafeterya</option>
               </select>
             </div>
             <div>

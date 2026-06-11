@@ -65,6 +65,14 @@ public class AdminDeviceController : ControllerBase
         return Ok(new { message = "Snapshot istendi. 10-30 sn içinde Pi yakalayacak." });
     }
 
+    [HttpPost("{deviceId}/regenerate-token")]
+    public async Task<IActionResult> RegenerateToken(string deviceId)
+    {
+        var token = await _deviceService.RegenerateTokenAsync(deviceId);
+        if (token == null) return NotFound();
+        return Ok(new { plainToken = token });
+    }
+
     [HttpGet("{deviceId}/snapshot")]
     public async Task<IActionResult> GetLatestSnapshot(string deviceId)
     {

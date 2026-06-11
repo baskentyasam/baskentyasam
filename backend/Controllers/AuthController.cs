@@ -614,6 +614,31 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationDto dto)
+    {
+        if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
+        {
+            return BadRequest(new { message = "E-posta adresi gerekli." });
+        }
+
+        var (success, cooldownSeconds) = await _authService.ResendVerificationEmailAsync(dto.Email);
+        if (!success)
+        {
+            return StatusCode(429, new
+            {
+                message = $"Çok sık deniyorsunuz. Lütfen {cooldownSeconds} saniye sonra tekrar deneyin.",
+                cooldownSeconds,
+            });
+        }
+        return Ok(new
+        {
+            message = "Doğrulama e-postası tekrar gönderildi (eğer hesap mevcutsa).",
+            cooldownSeconds,
+        });
+    }
+
     [HttpGet("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromQuery] string token, [FromQuery] int userId)
     {
