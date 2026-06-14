@@ -62,7 +62,11 @@ const LoginPage: React.FC = () => {
   const [showError, setShowError] = useState(false);
   const [success, setSuccess] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
-  const [isSignup, setIsSignup] = useState(false);
+  const [isSignup, setIsSignup] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("kayit") === "1";
+  });
 
   // Doğrulama maili tekrar gönderme
   const [resendEmail, setResendEmail] = useState<string>("");

@@ -71,7 +71,7 @@ const ForgotPasswordPage: React.FC = () => {
         </form>
 
         <p className="text-center text-sm text-slate-500">
-          <Link to="/" className="text-[#d71920] underline">
+          <Link to="/giris" className="text-[#d71920] underline">
             Giriş sayfasına dön
           </Link>
         </p>

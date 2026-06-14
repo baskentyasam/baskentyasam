@@ -87,7 +87,7 @@ const ProtectedAdminRoute: React.FC<Props> = ({
   }
 
   if (!user || (user.role !== "superadmin" && user.role !== "subadmin")) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/giris" replace />;
   }
 
   if (!allowed) {

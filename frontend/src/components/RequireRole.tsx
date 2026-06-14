@@ -12,7 +12,7 @@ interface Props {
 const RequireRole: React.FC<Props> = ({ children, allowedRoles }) => {
   const user = getCurrentUser();
   if (!user?.role || !allowedRoles.includes(user.role as AppRole)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/giris" replace />;
   }
   return <>{children}</>;
 };

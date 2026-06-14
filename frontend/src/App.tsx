@@ -6,6 +6,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
 
+import LandingPage from "./pages/LandingPage";
+
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -67,7 +69,9 @@ function App() {
 
       <Routes>
 
-        <Route path="/" element={<LoginPage />} />
+        <Route path="/" element={<LandingPage />} />
+
+        <Route path="/giris" element={<LoginPage />} />
 
         <Route path="/sifremi-unuttum" element={<ForgotPasswordPage />} />
 
