@@ -99,13 +99,6 @@ const LandingPage: React.FC = () => {
           }}
         />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-medium mb-6"
-            style={{ color: RED }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: RED }} />
-            Başkent Üniversitesi Bitirme Projesi
-          </div>
           <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
             Kampüsteki tüm hizmetler
             <br />
