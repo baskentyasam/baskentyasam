@@ -52,6 +52,12 @@ Thumbs.db
 Desktop.ini
 
 # ===================
+# Rapor materyalleri (yerel)
+# ===================
+Bitirme_Raporu/
+Örnek_rapor/
+
+# ===================
 # Debug Logs
 # ===================
 npm-debug.log*
