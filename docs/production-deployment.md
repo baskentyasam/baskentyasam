@@ -18,7 +18,7 @@ cp .env.example .env
 # SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD (min 12 karakter)
 # SMTP_USERNAME, SMTP_PASSWORD
 
-docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.vps.yml up --build -d
 ```
 
 ## Güvenlik davranışları
@@ -50,7 +50,7 @@ SUPERADMIN_NAME=Sistem Yöneticisi
 ### Veritabanı portu
 
 - **Local** (`docker-compose.yml`): `5433:5432` (pgAdmin/debug için)
-- **Production** (`docker-compose.prod.yml`): DB portu host'a **açılmaz**
+- **Production** (`docker-compose.vps.yml`): DB portu host'a **açılmaz**
 
 ### CORS
 
