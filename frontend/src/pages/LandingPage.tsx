@@ -21,8 +21,8 @@ const features = [
     img: "/kafeterya.png",
   },
   {
-    title: "Öğretim Elemanı Randevusu",
-    desc: "Öğretim elemanlarıyla görüşmek için online randevu oluştur, takip et; bildirimlerle haberdar ol.",
+    title: "Randevu Yönetimi",
+    desc: "Öğretim elemanlarıyla online randevu oluştur, takip et ve bildirimlerle anlık haberdar ol.",
     img: "/randevu.png",
   },
 ];
@@ -65,12 +65,11 @@ const LandingPage: React.FC = () => {
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <span
-              className="flex w-11 h-11 sm:w-12 sm:h-12 items-center justify-center rounded-lg shadow-sm"
-              style={{ backgroundColor: RED }}
-            >
-              <img src="/logo-baskent.png" alt="Başkent Üniversitesi" className="w-8 h-8 sm:w-9 sm:h-9 object-contain" />
-            </span>
+            <img
+              src="/logoo.png"
+              alt="Başkent Yaşam"
+              className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
+            />
             <div className="leading-tight">
               <div className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: RED }}>
                 Başkent Yaşam
@@ -204,12 +203,7 @@ const LandingPage: React.FC = () => {
       {/* FOOTER */}
       <footer className="border-t border-slate-200 bg-slate-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-center gap-2 text-sm text-slate-600">
-          <span
-            className="flex w-6 h-6 items-center justify-center rounded"
-            style={{ backgroundColor: RED }}
-          >
-            <img src="/logo-baskent.png" alt="" className="w-4 h-4 object-contain" />
-          </span>
+          <img src="/logoo.png" alt="" className="w-8 h-8 object-contain" />
           <span>© {new Date().getFullYear()} Başkent Yaşam</span>
         </div>
       </footer>
