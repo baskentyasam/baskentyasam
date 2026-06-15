@@ -36,17 +36,19 @@ const StudentDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="w-full border-b bg-[#d71920] text-white">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
-          <h1 className="text-2xl font-semibold">
+        <div className="max-w-6xl mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-6">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold leading-tight">
             Başkent Yaşam – {getRoleDisplayName(user?.role)}
           </h1>
-          <div className="flex items-center gap-4 text-base">
-            <span>Hoş Geldiniz, {user?.name || getRoleDisplayName(user?.role)}</span>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm sm:text-base">
+            <span className="hidden lg:inline truncate max-w-[220px]">
+              Hoş Geldiniz, {user?.name || getRoleDisplayName(user?.role)}
+            </span>
             <NotificationBell />
             <ProfileButton />
             <button
               onClick={openLogoutModal}
-              className="hover:underline text-sm text-white"
+              className="hover:underline text-sm text-white whitespace-nowrap"
             >
               Çıkış yap
             </button>

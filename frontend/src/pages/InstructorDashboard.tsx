@@ -36,19 +36,19 @@ const InstructorDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="w-full border-b bg-[#d71920] text-white">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
-          <h1 className="text-2xl font-semibold">
+        <div className="max-w-6xl mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-6">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold leading-tight">
             Başkent Yaşam – Öğretim Elemanı
           </h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <span className="hidden lg:inline text-sm truncate max-w-[220px]">
               Hoş Geldiniz, {user?.name || "Öğretim Elemanı"}
             </span>
             <NotificationBell />
             <ProfileButton />
             <button
               onClick={openLogoutModal}
-              className="hover:underline text-sm"
+              className="hover:underline text-sm whitespace-nowrap"
             >
               Çıkış yap
             </button>
