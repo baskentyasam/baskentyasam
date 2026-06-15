@@ -369,6 +369,20 @@ const CafeteriaOrderPage: React.FC = () => {
     return menuItems.filter((item) => item.category === selectedCategory);
   }, [menuItems, selectedCategory, searchTerm]);
 
+  // Sadece o kafede en az bir ürünü olan kategoriler gösterilir
+  const availableCategories = useMemo(() => {
+    const usedNames = new Set(menuItems.map((m) => m.category));
+    return categoryList.filter((c) => usedNames.has(c.name));
+  }, [menuItems]);
+
+  // Seçili kategori bu kafede yoksa ilk uygun olana geç
+  useEffect(() => {
+    if (availableCategories.length === 0) return;
+    if (!availableCategories.some((c) => c.name === selectedCategory)) {
+      setSelectedCategory(availableCategories[0].name);
+    }
+  }, [availableCategories, selectedCategory]);
+
   const pastStatuses: OrderStatus[] = ["Teslim Alındı", "İptal Edildi", "Ödenmedi"];
   const activeOrders = orders.filter(
     (order) => !pastStatuses.includes(order.status),
@@ -754,7 +768,7 @@ const CafeteriaOrderPage: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {categoryList.map((category) => (
+                {availableCategories.map((category) => (
                   <button
                     key={category.name}
                     onClick={() => setSelectedCategory(category.name)}
