@@ -61,7 +61,7 @@ const AdminParkingDetailPage: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="admin-card admin-card-body">
           <h3 className="mb-5 text-base font-semibold text-slate-900">Güncel Durum</h3>
-          <div className="mb-6 grid grid-cols-3 gap-4">
+          <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="rounded-lg bg-slate-50 px-4 py-5 text-center">
               <div className="text-2xl font-semibold text-slate-900">{detail.capacity}</div>
               <div className="mt-1 text-sm text-slate-500">Kapasite</div>
