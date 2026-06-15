@@ -595,16 +595,16 @@ const AdminAppointmentsPage: React.FC = () => {
               <div className="admin-card-body admin-empty">Randevu bulunamadı.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-left text-sm">
+                <table className="w-full min-w-[760px] md:min-w-[1100px] text-left text-xs md:text-sm [&_th]:px-3 [&_td]:px-3 [&_th]:py-2.5 [&_td]:py-2.5 md:[&_th]:px-6 md:[&_td]:px-6 md:[&_th]:py-4 md:[&_td]:py-4">
                   <thead className="border-b border-slate-100 bg-slate-50/80">
                     <tr>
-                      <th className="px-6 py-4 font-medium text-slate-700">Öğrenci</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Öğretim elemanı</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Fakülte / Bölüm</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Tarih / Saat</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Konu</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Durum</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">İşlem</th>
+                      <th className="font-medium text-slate-700">Öğrenci</th>
+                      <th className="font-medium text-slate-700">Öğretim elemanı</th>
+                      <th className="font-medium text-slate-700">Fakülte / Bölüm</th>
+                      <th className="font-medium text-slate-700">Tarih / Saat</th>
+                      <th className="font-medium text-slate-700">Konu</th>
+                      <th className="font-medium text-slate-700">Durum</th>
+                      <th className="font-medium text-slate-700">İşlem</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -696,15 +696,15 @@ const AdminAppointmentsPage: React.FC = () => {
               <div className="admin-card-body admin-empty">Öğretim elemanı bulunamadı.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-left text-sm">
+                <table className="w-full min-w-[760px] md:min-w-[1100px] text-left text-xs md:text-sm [&_th]:px-3 [&_td]:px-3 [&_th]:py-2.5 [&_td]:py-2.5 md:[&_th]:px-6 md:[&_td]:px-6 md:[&_th]:py-4 md:[&_td]:py-4">
                   <thead className="border-b border-slate-100 bg-slate-50/80">
                     <tr>
-                      <th className="px-6 py-4 font-medium text-slate-700">Ad Soyad</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">E-posta</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Fakülte</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Bölüm</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Hesap</th>
-                      <th className="px-6 py-4 font-medium text-slate-700">Randevuda</th>
+                      <th className="font-medium text-slate-700">Ad Soyad</th>
+                      <th className="font-medium text-slate-700">E-posta</th>
+                      <th className="font-medium text-slate-700">Fakülte</th>
+                      <th className="font-medium text-slate-700">Bölüm</th>
+                      <th className="font-medium text-slate-700">Hesap</th>
+                      <th className="font-medium text-slate-700">Randevuda</th>
                       <th className="px-6 py-4 font-medium text-slate-700">Randevu özeti</th>
                       <th className="px-6 py-4 font-medium text-slate-700">İşlem</th>
                     </tr>
