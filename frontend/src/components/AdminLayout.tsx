@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { getCurrentUser, getRoleDisplayName, logout } from "../services/authService";
 
@@ -19,6 +19,7 @@ const AdminLayout: React.FC<Props> = ({ title, children, subtitle }) => {
   const user = getCurrentUser();
   const location = useLocation();
   const isSuperAdmin = user?.role === "superadmin";
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const superAdminLinks: NavItem[] = [
     { to: "/admin", label: "Dashboard", icon: "🏠" },
@@ -45,19 +46,61 @@ const AdminLayout: React.FC<Props> = ({ title, children, subtitle }) => {
     window.location.href = "/";
   };
 
+  // Mobilde sayfa değişince sidebar kapansın
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Sidebar açıkken arka plan kaydırmasını engelle (mobil)
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [sidebarOpen]);
+
   return (
     <div className="min-h-screen flex bg-[#f4f7f9]">
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-[#1a1c2e] text-white">
-        <div className="px-6 pt-7 pb-5">
-          <div className="text-sm font-bold tracking-[0.12em]">
-            {isSuperAdmin ? "ADMIN" : "ALT ADMIN"}
+      {/* Backdrop — sadece mobile + sidebar açıkken */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col bg-[#1a1c2e] text-white transition-transform duration-300 ease-out lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-start justify-between px-6 pt-7 pb-5">
+          <div>
+            <div className="text-sm font-bold tracking-[0.12em]">
+              {isSuperAdmin ? "ADMIN" : "ALT ADMIN"}
+            </div>
+            <div className="mt-1 text-xs text-slate-400">
+              {isSuperAdmin ? "Admin Sistem Yöneticisi" : getRoleDisplayName(user?.role)}
+            </div>
           </div>
-          <div className="mt-1 text-xs text-slate-400">
-            {isSuperAdmin ? "Admin Sistem Yöneticisi" : getRoleDisplayName(user?.role)}
-          </div>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden -mr-2 rounded p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+            aria-label="Menüyü kapat"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3">
+        <nav className="flex-1 space-y-1 px-3 overflow-y-auto">
           {links.map((item) => {
             if (item.disabled || !item.to) {
               return (
@@ -101,15 +144,35 @@ const AdminLayout: React.FC<Props> = ({ title, children, subtitle }) => {
         </div>
       </aside>
 
-      <div className="ml-[260px] flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-8 py-4">
+      {/* İçerik */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:ml-[260px]">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between gap-4">
-            <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-            <span className="text-sm text-slate-400">Başkent Yaşam Yönetim Paneli</span>
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Hamburger — sadece mobile/tablet */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden -ml-1 rounded p-1.5 text-slate-600 hover:bg-slate-100"
+                aria-label="Menüyü aç"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              </button>
+              <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                {title}
+              </h1>
+            </div>
+            <span className="hidden md:inline text-sm text-slate-400">
+              Başkent Yaşam Yönetim Paneli
+            </span>
           </div>
         </header>
 
-        <main className="flex-1 px-8 py-8">
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           {subtitle && <p className="mb-6 text-sm text-slate-500">{subtitle}</p>}
           {children}
         </main>
