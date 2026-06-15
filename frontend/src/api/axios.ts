@@ -32,11 +32,17 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    // 401 Unauthorized hatası durumunda token'ı temizle ve login sayfasına yönlendir
+    // 401 Unauthorized: oturum suresi dolmus → temizle ve landing'e at.
+    // ANCAK Auth uc noktalarindan (login/register/forgot/reset/resend/verify) gelen 401
+    // hatali kimlik bilgileridir — sayfa yonlendirme yapma, hata UI'da gosterilsin.
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/';
+      const url = (error.config?.url || '').toLowerCase();
+      const isAuthEndpoint = url.includes('/auth/');
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   }
