@@ -65,7 +65,12 @@ const LandingPage: React.FC = () => {
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <img src="/logo192.png" alt="Başkent Yaşam" className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg shadow-sm" />
+            <span
+              className="flex w-11 h-11 sm:w-12 sm:h-12 items-center justify-center rounded-lg shadow-sm"
+              style={{ backgroundColor: RED }}
+            >
+              <img src="/logo-baskent.png" alt="Başkent Üniversitesi" className="w-8 h-8 sm:w-9 sm:h-9 object-contain" />
+            </span>
             <div className="leading-tight">
               <div className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: RED }}>
                 Başkent Yaşam
@@ -95,34 +100,44 @@ const LandingPage: React.FC = () => {
 
       {/* HERO */}
       <section className="relative overflow-hidden">
+        {/* Arka plan: Başkent kampüs fotoğrafı */}
         <div
-          className="absolute inset-0 -z-10 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 20% 20%, #d71920 0, transparent 40%), radial-gradient(circle at 80% 60%, #d71920 0, transparent 40%)",
-          }}
+          className="absolute inset-0 -z-20 bg-center bg-cover"
+          style={{ backgroundImage: "url('/kampus.jpg')" }}
+          aria-hidden
         />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-          <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
+        {/* Okunabilirlik için koyu degrade overlay */}
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(15,23,42,0.78) 0%, rgba(15,23,42,0.65) 60%, rgba(15,23,42,0.88) 100%)",
+          }}
+          aria-hidden
+        />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
+          <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight tracking-tight drop-shadow-md">
             Kampüsteki tüm hizmetler
             <br />
-            <span style={{ color: RED }}>tek platformda</span>
+            <span className="text-white" style={{ textShadow: "0 2px 8px rgba(215,25,32,0.6)" }}>
+              tek <span style={{ color: "#ff5a60" }}>platformda</span>
+            </span>
           </h1>
-          <p className="mt-5 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-5 text-base sm:text-lg text-slate-100/95 max-w-2xl mx-auto leading-relaxed">
             Kütüphane doluluğundan otopark boş alanına, kafeterya menüsünden anlık bildirimlere
             kadar günlük kampüs ihtiyaçlarını tek bir hesapla yönet.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
             <Link
               to="/giris?kayit=1"
-              className="px-6 py-3 rounded-lg text-white font-semibold shadow-sm hover:opacity-95"
+              className="px-6 py-3 rounded-lg text-white font-semibold shadow-lg hover:opacity-95"
               style={{ backgroundColor: RED }}
             >
               Hemen Kayıt Ol
             </Link>
             <Link
               to="/giris"
-              className="px-6 py-3 rounded-lg font-semibold border border-slate-300 hover:bg-slate-50"
+              className="px-6 py-3 rounded-lg font-semibold border border-white/70 text-white hover:bg-white/10 backdrop-blur-sm"
             >
               Giriş Yap
             </Link>
@@ -192,7 +207,12 @@ const LandingPage: React.FC = () => {
       {/* FOOTER */}
       <footer className="border-t border-slate-200 bg-slate-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-center gap-2 text-sm text-slate-600">
-          <img src="/logo192.png" alt="" className="w-6 h-6 rounded" />
+          <span
+            className="flex w-6 h-6 items-center justify-center rounded"
+            style={{ backgroundColor: RED }}
+          >
+            <img src="/logo-baskent.png" alt="" className="w-4 h-4 object-contain" />
+          </span>
           <span>© {new Date().getFullYear()} Başkent Yaşam</span>
         </div>
       </footer>
