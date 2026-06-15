@@ -21,8 +21,8 @@ const features = [
     img: "/kafeterya.png",
   },
   {
-    title: "Doluluk Takibi",
-    desc: "Kampüs içine konuşlandırılmış kameralar görüntü işleme ile giriş-çıkışları otomatik sayar.",
+    title: "Öğretim Elemanı Randevusu",
+    desc: "Öğretim elemanlarıyla görüşmek için online randevu oluştur, takip et; bildirimlerle haberdar ol.",
     img: "/randevu.png",
   },
 ];
@@ -65,10 +65,14 @@ const LandingPage: React.FC = () => {
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <img src="/logo192.png" alt="Başkent Yaşam" className="w-9 h-9 rounded" />
+            <img src="/logo192.png" alt="Başkent Yaşam" className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg shadow-sm" />
             <div className="leading-tight">
-              <div className="font-semibold text-slate-900">Başkent Yaşam</div>
-              <div className="text-[11px] text-slate-500 -mt-0.5">Kampüs Platformu</div>
+              <div className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: RED }}>
+                Başkent Yaşam
+              </div>
+              <div className="text-xs sm:text-sm text-slate-500 font-medium -mt-0.5">
+                Kampüs Platformu
+              </div>
             </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
@@ -187,19 +191,9 @@ const LandingPage: React.FC = () => {
 
       {/* FOOTER */}
       <footer className="border-t border-slate-200 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-600">
-          <div className="flex items-center gap-2">
-            <img src="/logo192.png" alt="" className="w-6 h-6 rounded" />
-            <span>© {new Date().getFullYear()} Başkent Yaşam</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link to="/giris" className="hover:text-slate-900">
-              Giriş
-            </Link>
-            <Link to="/giris?kayit=1" className="hover:text-slate-900">
-              Kayıt
-            </Link>
-          </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-center gap-2 text-sm text-slate-600">
+          <img src="/logo192.png" alt="" className="w-6 h-6 rounded" />
+          <span>© {new Date().getFullYear()} Başkent Yaşam</span>
         </div>
       </footer>
     </div>
