@@ -64,20 +64,12 @@ const LandingPage: React.FC = () => {
       {/* NAV */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center">
             <img
               src="/logoo.png"
               alt="Başkent Yaşam"
-              className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
+              className="h-14 sm:h-16 w-auto object-contain"
             />
-            <div className="leading-tight">
-              <div className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: RED }}>
-                Başkent Yaşam
-              </div>
-              <div className="text-xs sm:text-sm text-slate-500 font-medium -mt-0.5">
-                Kampüs Platformu
-              </div>
-            </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
