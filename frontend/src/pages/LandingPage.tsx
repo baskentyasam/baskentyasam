@@ -99,23 +99,20 @@ const LandingPage: React.FC = () => {
       </header>
 
       {/* HERO */}
-      <section className="relative overflow-hidden">
-        {/* Arka plan: Başkent kampüs fotoğrafı */}
-        <div
-          className="absolute inset-0 -z-20 bg-center bg-cover"
-          style={{ backgroundImage: "url('/kampus.jpg')" }}
-          aria-hidden
-        />
+      <section
+        className="relative overflow-hidden bg-center bg-cover"
+        style={{ backgroundImage: "url('/kampus.jpg')" }}
+      >
         {/* Okunabilirlik için koyu degrade overlay */}
         <div
-          className="absolute inset-0 -z-10"
+          className="absolute inset-0"
           style={{
             background:
               "linear-gradient(180deg, rgba(15,23,42,0.78) 0%, rgba(15,23,42,0.65) 60%, rgba(15,23,42,0.88) 100%)",
           }}
           aria-hidden
         />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
           <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight tracking-tight drop-shadow-md">
             Kampüsteki tüm hizmetler
             <br />
