@@ -51,15 +51,25 @@ interface PastOrder {
 }
 
 const categoryList = [
-  { name: "Sandviçler", icon: "🥪" },
-  { name: "Makarnalar", icon: "🍝" },
+  { name: "Güne Başlarken", icon: "🍳" },
   { name: "Tostlar", icon: "🍞" },
+  { name: "Sandviçler", icon: "🥪" },
   { name: "Salatalar", icon: "🥗" },
+  { name: "Burgerler", icon: "🍔" },
+  { name: "Ara Sıcaklar", icon: "🍟" },
+  { name: "Pizzalar", icon: "🍕" },
+  { name: "Makarnalar", icon: "🍝" },
+  { name: "Wraplar", icon: "🌯" },
+  { name: "Ana Yemekler", icon: "🍗" },
+  { name: "Tatlılar", icon: "🍰" },
+  { name: "Çay", icon: "🍵" },
+  { name: "Bitki Çayları", icon: "🌿" },
+  { name: "Kahveler", icon: "☕" },
+  { name: "Soğuk İçecekler", icon: "🥤" },
+  // Geriye dönük uyumluluk (eski kafeler için)
   { name: "Tavuk Yemekleri", icon: "🍗" },
   { name: "Et Yemekleri", icon: "🥩" },
-  { name: "Soğuk İçecekler", icon: "🥤" },
   { name: "Sıcak İçecekler", icon: "☕" },
-  { name: "Tatlılar", icon: "🍰" },
 ];
 
 const categoryMapping: Record<string, string> = {
@@ -88,15 +98,25 @@ const categoryMapping: Record<string, string> = {
 };
 
 const categoryIcons: Record<string, string> = {
-  Sandviçler: "🥪",
-  Makarnalar: "🍝",
+  "Güne Başlarken": "🍳",
   Tostlar: "🍞",
+  Sandviçler: "🥪",
   Salatalar: "🥗",
+  Burgerler: "🍔",
+  "Ara Sıcaklar": "🍟",
+  Pizzalar: "🍕",
+  Makarnalar: "🍝",
+  Wraplar: "🌯",
+  "Ana Yemekler": "🍗",
+  Tatlılar: "🍰",
+  Çay: "🍵",
+  "Bitki Çayları": "🌿",
+  Kahveler: "☕",
+  "Soğuk İçecekler": "🥤",
+  // Geriye dönük
   "Tavuk Yemekleri": "🍗",
   "Et Yemekleri": "🥩",
-  "Soğuk İçecekler": "🥤",
   "Sıcak İçecekler": "☕",
-  Tatlılar: "🍰",
 };
 
 const statusStyles: Record<string, string> = {
@@ -153,7 +173,22 @@ function clearCartStorage() {
 }
 
 function mapApiToMenuItem(apiItem: MenuItemFromApi): MenuItem {
-  const category = categoryMapping[apiItem.name] || "Et Yemekleri";
+  // Yeni format: Description = "Kategori — açıklama metni" şeklinde başlar.
+  // Eski format: name → categoryMapping fallback.
+  const rawDesc = apiItem.description || "";
+  const dashIndex = rawDesc.indexOf(" — ");
+  let category: string;
+  let cleanDescription: string;
+  if (dashIndex >= 0) {
+    category = rawDesc.slice(0, dashIndex).trim();
+    cleanDescription = rawDesc.slice(dashIndex + 3).trim();
+  } else if (rawDesc.trim() && categoryList.some((c) => c.name === rawDesc.trim())) {
+    category = rawDesc.trim();
+    cleanDescription = "";
+  } else {
+    category = categoryMapping[apiItem.name] || "Diğer";
+    cleanDescription = rawDesc;
+  }
   const image = categoryIcons[category] || "🍽️";
   return {
     id: apiItem.id,
@@ -161,7 +196,7 @@ function mapApiToMenuItem(apiItem: MenuItemFromApi): MenuItem {
     price: apiItem.price,
     category,
     image,
-    description: apiItem.description || "",
+    description: cleanDescription,
   };
 }
 
