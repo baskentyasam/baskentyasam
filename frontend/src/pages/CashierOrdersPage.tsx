@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   cashierApprove,
   cashierCancel,
@@ -18,12 +18,18 @@ import {
   OrderStatus,
 } from "../services/orderService";
 import { getActiveCafeterias, ActiveCafeteria } from "../services/cafeteriaService";
-import { getCurrentUser } from "../services/authService";
+import { getCurrentUser, logout } from "../services/authService";
 
 type CafeteriaFilterValue = "ALL" | number;
 
 const CashierOrdersPage: React.FC = () => {
   const user = getCurrentUser();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/giris", { replace: true });
+  };
 
   const [orders, setOrders] = useState<OrderResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,9 +222,13 @@ const CashierOrdersPage: React.FC = () => {
                 <span className="font-mono">{riskOverview.totalOpenNotPaidOrders}</span> açık ödenmedi
               </div>
             )}
-            <Link to="/" className="text-sm underline hover:opacity-90 whitespace-nowrap">
-              Çıkış / Giriş sayfası
-            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-sm underline hover:opacity-90 whitespace-nowrap"
+            >
+              Çıkış Yap
+            </button>
           </div>
         </div>
       </header>
