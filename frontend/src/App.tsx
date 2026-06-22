@@ -8,6 +8,10 @@ import LoginPage from "./pages/LoginPage";
 
 import LandingPage from "./pages/LandingPage";
 
+import IremPage from "./pages/IremPage";
+
+import HahaPage from "./pages/HahaPage";
+
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -70,6 +74,10 @@ function App() {
       <Routes>
 
         <Route path="/" element={<LandingPage />} />
+
+        <Route path="/irem" element={<IremPage />} />
+
+        <Route path="/haha" element={<HahaPage />} />
 
         <Route path="/giris" element={<LoginPage />} />
 
